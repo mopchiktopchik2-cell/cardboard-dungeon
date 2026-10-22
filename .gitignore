@@ -17,6 +17,7 @@ sysinfo.txt
 .vscode/
 *.csproj
 *.sln
+*.slnx
 *.suo
 *.user
 *.userprefs
@@ -45,6 +46,9 @@ Assets/Plugins/Editor/JetBrains*
 *.exe
 *.zip
 !Build/.gitkeep
+
+# Локальная упаковка релиза
+dist/
 
 # Временное
 *.bak
