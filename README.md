@@ -14,11 +14,13 @@ Top-down рогалик в духе Archero, собранный из плоск�
 
 ## Скачать
 
-Готовая сборка для Windows x64 лежит в разделе **Releases**:
+**[Скачать игру для Windows x64](https://github.com/mopchiktopchik2-cell/cardboard-dungeon/releases/download/v1.1/CardboardDungeon_v1.1_win64.zip)** — `CardboardDungeon_v1.1_win64.zip`, около 40 МБ.
 
-- `CardboardDungeon_v1.1_win64.zip`
-- распакуйте архив и запустите `CardboardDungeon.exe`;
-- установка не требуется.
+> ⚠️ Не используйте зелёную кнопку **Code → Download ZIP**: это архив исходников без `.exe`. Готовая сборка лежит только в **Releases → Assets**.
+
+- распакуйте архив целиком и запустите `CardboardDungeon.exe`;
+- установка не требуется;
+- если Windows SmartScreen предупреждает, выберите «Подробнее» → «Выполнить в любом случае».
 
 Ссылка на релиз: [v1.1](https://github.com/mopchiktopchik2-cell/cardboard-dungeon/releases/tag/v1.1). Сборка **v1.0** остаётся доступной в истории релизов.
 
