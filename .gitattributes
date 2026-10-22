@@ -12,6 +12,8 @@
 *.json text
 *.md text
 *.txt text
+*.bat text eol=crlf
+*.cmd text eol=crlf
 *.asmdef text
 
 *.png binary
