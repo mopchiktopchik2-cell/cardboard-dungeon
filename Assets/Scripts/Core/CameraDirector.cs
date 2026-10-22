@@ -32,7 +32,7 @@ public class CameraDirector : MonoBehaviour
         Cam.orthographic = true;
         Cam.orthographicSize = BaseSize;
         Cam.clearFlags = CameraClearFlags.SolidColor;
-        Cam.backgroundColor = new Color32(22, 16, 24, 255);
+        Cam.backgroundColor = new Color32(9, 7, 14, 255);
         Cam.nearClipPlane = 0.1f;
         Cam.farClipPlane = 100f;
         Cam.transform.position = BasePosition;

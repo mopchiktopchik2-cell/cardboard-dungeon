@@ -3,13 +3,13 @@ using UnityEngine;
 
 public class PlayerStats
 {
-    public float maxHp = 120f;
-    public float hp = 120f;
-    public float speed = 5.2f;
-    public float damage = 10f;
-    public float attackInterval = 0.7f;
-    public float range = 7.4f;
-    public float critChance = 0.05f;
+    public float maxHp = 100f;
+    public float hp = 100f;
+    public float speed = 4.9f;
+    public float damage = 9f;
+    public float attackInterval = 0.75f;
+    public float range = 6.9f;
+    public float critChance = 0.04f;
     public float critMult = 1.8f;
     public float lifesteal = 0f;
     public float cdr = 0f;
@@ -35,9 +35,10 @@ public class Player : MonoBehaviour
     public SkillSystem Skills;
     public ShieldFx ActiveShieldFx;
     public float Shield;
+    public float ShieldTimer;
     public float Invuln;
     public float DashCd;
-    public float DashCooldown = 1.1f;
+    public float DashCooldown = 1.35f;
     public bool Dead;
     public bool Control = true;
     public float PoisonTimer;
@@ -49,7 +50,6 @@ public class Player : MonoBehaviour
     private float autoTimer;
     private float poisonTick;
     private float stepTimer;
-    private float invulnFlash;
     private Coroutine dashRoutine;
     private Enemy currentTarget;
     private Art art;
@@ -71,6 +71,7 @@ public class Player : MonoBehaviour
     {
         art = Game.I.Art;
         Visual = PaperActor.Create(transform, art, "wizard", 1.0f, Color.white, true, false);
+        Visual.StepDust = true;
         Stats.hp = Stats.maxHp;
         gameObject.layer = 0;
     }
@@ -80,6 +81,7 @@ public class Player : MonoBehaviour
         Stats = new PlayerStats();
         Stats.hp = Stats.maxHp;
         Shield = 0f;
+        ShieldTimer = 0f;
         Invuln = 0f;
         DashCd = 0f;
         Dead = false;
@@ -89,6 +91,8 @@ public class Player : MonoBehaviour
         autoTimer = 0f;
         currentTarget = null;
         transform.rotation = Quaternion.identity;
+        if (dashRoutine != null) StopCoroutine(dashRoutine);
+        dashRoutine = null;
         Visual.ResetVisual();
         Visual.SetScale(1f);
         Visual.SetTint(Color.white);
@@ -103,15 +107,16 @@ public class Player : MonoBehaviour
         Visual.Walking = false;
         Visual.Face(-1f);
         Visual.SetScale(1.05f);
+        Visual.PoseTilt = 2f;
         Control = false;
         Dead = false;
-        Visual.transform.localRotation = Quaternion.Euler(0f, 0f, 2f);
     }
 
     public void RevivePosition(Vector2 pos)
     {
         transform.position = pos;
         Visual.ResetVisual();
+        Visual.transform.localRotation = Quaternion.identity;
         Visual.SetVisible(true);
         Visual.SetScale(1f);
         Visual.Walking = false;
@@ -150,6 +155,15 @@ public class Player : MonoBehaviour
 
         float dt = Time.deltaTime;
         if (Invuln > 0f) Invuln -= dt;
+        if (ShieldTimer > 0f)
+        {
+            ShieldTimer -= dt;
+            if (ShieldTimer <= 0f)
+            {
+                ShieldTimer = 0f;
+                Shield = 0f;
+            }
+        }
         if (DashCd > 0f) DashCd -= dt;
         if (autoTimer > 0f) autoTimer -= dt;
         if (RageTimer > 0f) RageTimer -= dt;
@@ -232,7 +246,9 @@ public class Player : MonoBehaviour
         Vector2 dir = ((Vector2)target.transform.position + Vector2.up * 0.5f - origin).normalized;
         facing = dir;
         Visual.Face(dir.x);
-        Visual.Pulse(0.05f, 0.12f);
+        Visual.Attack(dir, 1f);
+        Game.I.Fx.Sprite("fx_glow", origin, 0.42f, 0.13f,
+            new Color(0.55f, 1f, 0.95f, 0.75f), 1660, 0f, 0f, 0f);
 
         bool crit = Random.value < Stats.critChance;
         float dmg = Stats.damage * RageMult * (crit ? Stats.critMult : 1f);
@@ -253,6 +269,7 @@ public class Player : MonoBehaviour
         Invuln = Mathf.Max(Invuln, 0.28f);
         Game.I.Audio.Play("sfx_dash", 0.6f);
         Game.I.Fx.Dust(transform.position, 6);
+        Visual.Dash();
         float t = 0f;
         while (t < 0.17f)
         {
@@ -286,6 +303,7 @@ public class Player : MonoBehaviour
             if (Shield <= 0f)
             {
                 Shield = 0f;
+                ShieldTimer = 0f;
             }
         }
 
@@ -300,6 +318,7 @@ public class Player : MonoBehaviour
         {
             Invuln = 0.55f;
             Visual.Flash(new Color(1f, 0.35f, 0.35f), 0.12f);
+            Visual.Hit((Vector2)transform.position - source, 1f);
             Game.I.Shake(0.1f, 0.2f);
             Game.I.Hitstop(0.035f);
             Game.I.Audio.Play("sfx_hit", 0.65f);
@@ -311,8 +330,9 @@ public class Player : MonoBehaviour
             {
                 Stats.secondWindUsed = true;
                 Stats.hp = 1f;
-                Shield = 20f;
-                Invuln = 2f;
+                Shield = 12f;
+                ShieldTimer = 6f;
+                Invuln = 1.4f;
                 Game.I.Fx.Heal(transform.position);
                 Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.7f, "ВТОРОЕ ДЫХАНИЕ",
                     new Color(1f, 0.85f, 0.4f), 1.2f);
@@ -340,7 +360,9 @@ public class Player : MonoBehaviour
 
     public void AddShield(float amount, float duration = 6f)
     {
+        if (amount <= 0f) return;
         Shield += amount;
+        ShieldTimer = Mathf.Max(ShieldTimer, duration);
         Game.I.Fx.Shield(transform, duration);
         Game.I.Fx.Ring(transform.position + Vector3.up * 0.6f, new Color(0.55f, 0.8f, 1f), 0.7f, 0.4f);
         Game.I.Audio.Play("sfx_shield", 0.5f);
@@ -377,6 +399,7 @@ public class Player : MonoBehaviour
         float t = 0f;
         while (t < duration)
         {
+            if (Dead || (Game.I != null && Game.I.State == GameState.Dead)) yield break;
             if (Game.I.SkipRequested)
             {
                 transform.position = target;
@@ -399,6 +422,8 @@ public class Player : MonoBehaviour
         Dead = true;
         Control = false;
         Stats.hp = 0f;
+        if (dashRoutine != null) StopCoroutine(dashRoutine);
+        dashRoutine = null;
         Vector2 dir = (Vector2)transform.position - source;
         Visual.Walking = false;
         Visual.DeathAnim(dir, 0.75f);

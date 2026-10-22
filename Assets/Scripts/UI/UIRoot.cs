@@ -62,6 +62,8 @@ public class UIRoot : MonoBehaviour
     private Image wipeImage;
     private Image bossGroup;
     private Image bannerBg;
+    private Image grainImage;
+    private Image lowHpImage;
     private RectTransform skipRoot;
     private Text skipText;
 
@@ -245,37 +247,116 @@ public class UIRoot : MonoBehaviour
         menuGroup = NewGroup("Menu");
         menuRoot = menuGroup.GetComponent<RectTransform>();
 
-        var dim = Img(menuRoot, art.UI("white"), new Color(0.04f, 0.02f, 0.05f, 0.55f),
+        // Layered dungeon backdrop: a cold arch, candlelight, drifting fog and embers.
+        var backdrop = Img(menuRoot, art.UI("ui_menu_bg"), Color.white,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
-        dim.raycastTarget = true;
+        backdrop.preserveAspect = false;
+        backdrop.raycastTarget = true;
+
+        var frame = Img(menuRoot, art.UI("ui_menu_frame"), Color.white,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+        frame.raycastTarget = false;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var fog = Img(menuRoot, art.UI("fx_glow"), new Color(0.42f, 0.48f, 0.72f, 0.055f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(-380f + i * 250f, -220f + (i % 2) * 70f), new Vector2(760f, 400f), false);
+            var drift = fog.gameObject.AddComponent<UIDrift>();
+            drift.Init(new Vector2(80f, 34f), 0.12f + i * 0.02f, i * 1.7f, 0f);
+        }
+
+        var logoGlow = Img(menuRoot, art.UI("fx_glow"), new Color(0.55f, 0.27f, 0.65f, 0.16f),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -40f), new Vector2(980f, 430f), false);
+        logoGlow.gameObject.AddComponent<UIPulseAlpha>().Init(0.12f, 0.24f, 0.42f);
+
+        var rune = Img(menuRoot, art.UI("ui_rune"), new Color(0.82f, 0.65f, 0.34f, 0.16f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 58f), new Vector2(650f, 650f), false);
+        rune.gameObject.AddComponent<UIRotate>().Speed = -4.5f;
+        rune.gameObject.AddComponent<UIPulseAlpha>().Init(0.10f, 0.19f, 0.26f);
 
         var logo = Img(menuRoot, art.UI("ui_logo"), Color.white,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -54f),
-            new Vector2(840f, 204f), false);
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -42f),
+            new Vector2(780f, 189f), false);
         logo.preserveAspect = true;
+        logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
+        logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "КАРТОННЫЙ РОГАЛИК", 24, Pal.Cream, TextAnchor.MiddleCenter,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -272f),
-            new Vector2(700f, 40f), art.Sans, true);
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.1", 21, new Color(0.84f, 0.74f, 0.58f),
+            TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f), new Vector2(0f, -247f), new Vector2(760f, 32f), art.Sans, true);
 
-        MakeButton(menuRoot, "НАЧАТЬ ЗАБЕГ", new Vector2(0f, 70f), new Vector2(360f, 72f),
+        Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.9f),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -278f), new Vector2(620f, 42f), false);
+
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Img(menuRoot, art.UI("white"), new Color(0.72f, 0.55f, 0.32f, 0.2f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(side * 506f, 36f), new Vector2(2f, 530f), false);
+            var tick = Img(menuRoot, art.UI("white"), new Color(0.9f, 0.72f, 0.42f, 0.35f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(side * 506f, 36f), new Vector2(6f, 6f), false);
+            tick.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        }
+
+        var bestPanel = Img(menuRoot, art.UI("ui_panel_dark", new Vector4(18f, 18f, 18f, 18f)),
+            new Color(1f, 1f, 1f, 0.86f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(38f, 20f), new Vector2(456f, 84f), true);
+        bestPanel.raycastTarget = false;
+        var bestLabel = TextAt(bestPanel.rectTransform, "ЛУЧШИЙ ЗАБЕГ", 15,
+            new Color(0.76f, 0.65f, 0.48f), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f, -12f),
+            new Vector2(380f, 22f), art.Sans, false);
+        bestLabel.fontStyle = FontStyle.Bold;
+        menuBest = TextAt(bestPanel.rectTransform, "", 20, new Color(0.9f, 0.83f, 0.68f),
+            TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
+            new Vector2(22f, 14f), new Vector2(410f, 36f), art.Sans, true);
+
+        MakeButton(menuRoot, "НАЧАТЬ ЗАБЕГ", new Vector2(0f, 82f), new Vector2(390f, 70f),
             () => Game.I.StartRun(), 30);
-        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(0f, -18f), new Vector2(360f, 62f),
+        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(0f, 2f), new Vector2(390f, 60f),
             ToggleHelp, 25, false);
-        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(0f, -96f), new Vector2(360f, 56f),
-            () => Game.I.QuitGame(), 24, false);
+        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(0f, -72f), new Vector2(320f, 52f),
+            () => Game.I.QuitGame(), 23, false);
 
-        menuBest = TextAt(menuRoot, "", 20, new Color(0.85f, 0.78f, 0.66f), TextAnchor.MiddleLeft,
-            new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(34f, 34f),
-            new Vector2(700f, 70f), art.Sans, true);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Img(menuRoot, art.UI("white"), new Color(0.8f, 0.62f, 0.36f, 0.5f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(side * 235f, 82f), new Vector2(44f, 2f), false);
+            var diamond = Img(menuRoot, art.UI("white"), new Color(0.95f, 0.78f, 0.46f, 0.8f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(side * 258f, 82f), new Vector2(7f, 7f), false);
+            diamond.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+        }
 
-        TextAt(menuRoot, "WASD — движение   ·   автоатака   ·   1–5 — навыки   ·   SPACE — рывок   ·   ESC — пауза",
-            18, new Color(0.8f, 0.74f, 0.64f, 0.9f), TextAnchor.MiddleCenter,
-            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 28f),
-            new Vector2(1250f, 34f), art.Sans, true);
+        for (int i = 0; i < 18; i++)
+        {
+            var ember = Img(menuRoot, art.UI("fx_ember"),
+                i % 3 == 0 ? new Color(1f, 0.55f, 0.22f, 0.55f) : new Color(1f, 0.72f, 0.36f, 0.4f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(-710f + (i * 83) % 1420, -430f + (i * 47) % 860),
+                new Vector2(10f + (i % 4) * 3f, 10f + (i % 4) * 3f), false);
+            ember.raycastTarget = false;
+            ember.gameObject.AddComponent<UIMote>().Init(12f + (i % 5) * 5f, 0.8f + (i % 3) * 0.4f, i * 1.9f);
+        }
 
-        TextAt(menuRoot, "v1.0", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
-            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-24f, 22f),
+        var controlsBg = Img(menuRoot, art.UI("ui_panel_dark", new Vector4(14f, 14f, 14f, 14f)),
+            new Color(1f, 1f, 1f, 0.72f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(1120f, 38f), true);
+        controlsBg.raycastTarget = false;
+
+        TextAt(menuRoot, "WASD / стрелки — движение   ·   автоатака   ·   1–5 — навыки   ·   SPACE — рывок   ·   ESC — пауза",
+            18, new Color(0.8f, 0.74f, 0.64f, 0.95f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
+            new Vector2(1120f, 28f), art.Sans, true);
+
+        TextAt(menuRoot, "v1.1", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
+            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 22f),
             new Vector2(120f, 24f), art.Sans, false);
 
         BuildHelp();
@@ -336,6 +417,7 @@ public class UIRoot : MonoBehaviour
     public void ShowMenu()
     {
         if (helpPanel != null) helpPanel.gameObject.SetActive(false);
+        ResetLowHp();
         SetGroup(menuGroup, true);
         SetGroup(hudGroup, false);
         SetGroup(perkGroup, false);
@@ -346,8 +428,8 @@ public class UIRoot : MonoBehaviour
         {
             var run = Game.I.Run;
             string best = run.BestRoom > 0
-                ? "ЛУЧШИЙ ЗАБЕГ: КОМНАТА " + run.BestRoom + "  ·  УБИТО " + run.BestKills
-                : "ЛУЧШИЙ ЗАБЕГ: —";
+                ? "КОМНАТА " + run.BestRoom + "  ·  УБИТО " + run.BestKills
+                : "—";
             menuBest.text = best;
         }
         if (skipRoot != null) skipRoot.gameObject.SetActive(false);
@@ -701,10 +783,10 @@ public class UIRoot : MonoBehaviour
         SetChoiceHint(2, "выбрать карту");
 
         BuildCard(restRoot, new Vector2(-220f, 0f), "icon_heal", "ОТДОХНУТЬ",
-            "Восстановить 35% максимального здоровья.\n\nБезопасно и просто.",
+            "Восстановить 28% максимального здоровья.\n\nБезопасно и просто.",
             Pal.Green, "1", "ЛЕЧЕНИЕ", () => Game.I.ChooseRest(true));
-        BuildCard(restRoot, new Vector2(220f, 0f), "icon_perk_slot", "СЛУЧАЙНЫЙ ПЕРК",
-            "Взять случайный перк и стать сильнее.\n\nРискованно, но полезно.",
+        BuildCard(restRoot, new Vector2(220f, 0f), "icon_perk_slot", "ПЕРК НА ВЫБОР",
+            "Выбрать один из трёх перков и стать сильнее.\n\nРискованно, но полезно.",
             Pal.Gold, "2", "УСИЛЕНИЕ", () => Game.I.ChooseRest(false));
     }
 
@@ -930,6 +1012,7 @@ public class UIRoot : MonoBehaviour
 
     public void ShowPause()
     {
+        ResetLowHp();
         if (masterSlider != null) masterSlider.SetValueWithoutNotify(Game.I.Audio.Master);
         if (musicSlider != null) musicSlider.SetValueWithoutNotify(Game.I.Audio.MusicVolume);
         if (sfxSlider != null) sfxSlider.SetValueWithoutNotify(Game.I.Audio.SfxVolume);
@@ -985,6 +1068,8 @@ public class UIRoot : MonoBehaviour
 
     public void ShowEnd(bool victory)
     {
+        ResetLowHp();
+        SetGroup(hudGroup, false);
         SetGroup(endGroup, true);
         endTitle.text = victory ? "ПОБЕДА!" : "ПОРАЖЕНИЕ";
         endTitle.color = victory ? Pal.Gold : new Color(0.85f, 0.3f, 0.28f);
@@ -1070,13 +1155,23 @@ public class UIRoot : MonoBehaviour
 
     private void BuildOverlays()
     {
-        var vignette = FullImage("Vignette", art.UI("ui_vignette"), new Color(1f, 1f, 1f, 0.85f));
+        // A cold cinematic grade, heavier vignette and living film grain.
+        var cool = FullImage("CoolGrade", art.UI("white"), new Color(0.035f, 0.07f, 0.15f, 0.10f));
+        cool.raycastTarget = false;
+
+        var vignette = FullImage("Vignette", art.UI("ui_vignette"), new Color(1f, 1f, 1f, 0.92f));
         vignette.raycastTarget = false;
 
-        var grain = FullImage("Grain", art.UI("ui_grain"), new Color(1f, 1f, 1f, 0.07f));
-        grain.type = Image.Type.Tiled;
-        grain.preserveAspect = false;
-        grain.raycastTarget = false;
+        lowHpImage = FullImage("LowHpVignette", art.UI("ui_vignette"), new Color(0.8f, 0.05f, 0.04f, 0f));
+        lowHpImage.raycastTarget = false;
+
+        grainImage = FullImage("Grain", art.UI("ui_grain"), new Color(1f, 1f, 1f, 0.11f));
+        grainImage.type = Image.Type.Tiled;
+        grainImage.preserveAspect = false;
+        grainImage.raycastTarget = false;
+        grainImage.rectTransform.offsetMin = new Vector2(-24f, -24f);
+        grainImage.rectTransform.offsetMax = new Vector2(24f, 24f);
+        grainImage.gameObject.AddComponent<UIGrainDrift>().Init(0.09f, 0.13f);
 
         flashImage = FullImage("Flash", art.UI("white"), new Color(1f, 1f, 1f, 0f));
         flashImage.raycastTarget = false;
@@ -1209,8 +1304,14 @@ public class UIRoot : MonoBehaviour
         }
     }
 
+    private void ResetLowHp()
+    {
+        if (lowHpImage != null) lowHpImage.color = new Color(0.8f, 0.05f, 0.04f, 0f);
+    }
+
     private void UpdateHud()
     {
+        if (Game.I == null) return;
         var p = Game.I.Player;
         if (p == null) return;
         float pct = Mathf.Clamp01(p.Stats.hp / Mathf.Max(1f, p.Stats.maxHp));
@@ -1221,6 +1322,14 @@ public class UIRoot : MonoBehaviour
         }
         if (hpText != null) hpText.text = Mathf.CeilToInt(p.Stats.hp) + " / " + Mathf.CeilToInt(p.Stats.maxHp);
         if (shieldText != null) shieldText.text = p.Shield > 0.5f ? "ЩИТ " + Mathf.CeilToInt(p.Shield) : "";
+        if (lowHpImage != null)
+        {
+            float danger = Game.I.State == GameState.Combat && pct < 0.34f
+                ? Mathf.Clamp01((0.34f - pct) / 0.34f)
+                : 0f;
+            float pulse = 0.72f + Mathf.Sin(readyPulse * 5.2f) * 0.28f;
+            lowHpImage.color = new Color(0.8f, 0.05f, 0.04f, danger * 0.34f * pulse);
+        }
 
         var run = Game.I.Run;
         if (statsText != null)
@@ -1339,6 +1448,162 @@ public class UIButtonFx : MonoBehaviour, IPointerEnterHandler, IPointerExitHandl
         float rot = baseRot + hovered * -1.1f;
         rt.localRotation = Quaternion.Lerp(rt.localRotation, Quaternion.Euler(0f, 0f, rot),
             Time.unscaledDeltaTime * 14f);
+    }
+}
+
+public class UIRotate : MonoBehaviour
+{
+    public float Speed = 5f;
+
+    private void Update()
+    {
+        transform.Rotate(0f, 0f, Speed * Time.unscaledDeltaTime);
+    }
+}
+
+public class UIFloat : MonoBehaviour
+{
+    private RectTransform rt;
+    private Vector2 origin;
+    private Vector2 amplitude;
+    private float speed;
+    private float phase;
+
+    public void Init(Vector2 amp, float frequency, float startPhase)
+    {
+        rt = (RectTransform)transform;
+        origin = rt.anchoredPosition;
+        amplitude = amp;
+        speed = frequency;
+        phase = startPhase;
+    }
+
+    private void Update()
+    {
+        if (rt == null) return;
+        float t = Time.unscaledTime * speed + phase;
+        rt.anchoredPosition = origin + new Vector2(Mathf.Sin(t) * amplitude.x, Mathf.Cos(t * 0.83f) * amplitude.y);
+    }
+}
+
+public class UIPulseAlpha : MonoBehaviour
+{
+    private Image image;
+    private float min;
+    private float max;
+    private float speed;
+    private float phase;
+
+    public void Init(float minimum, float maximum, float frequency)
+    {
+        image = GetComponent<Image>();
+        min = minimum;
+        max = maximum;
+        speed = frequency;
+        phase = UnityEngine.Random.value * 6.28f;
+    }
+
+    private void Update()
+    {
+        if (image == null) return;
+        Color c = image.color;
+        c.a = Mathf.Lerp(min, max, 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * speed + phase));
+        image.color = c;
+    }
+}
+
+public class UIDrift : MonoBehaviour
+{
+    private RectTransform rt;
+    private Vector2 origin;
+    private Vector2 amplitude;
+    private float speed;
+    private float phase;
+    private float spin;
+
+    public void Init(Vector2 amp, float frequency, float startPhase, float rotationSpeed)
+    {
+        rt = (RectTransform)transform;
+        origin = rt.anchoredPosition;
+        amplitude = amp;
+        speed = frequency;
+        phase = startPhase;
+        spin = rotationSpeed;
+    }
+
+    private void Update()
+    {
+        if (rt == null) return;
+        float t = Time.unscaledTime * speed + phase;
+        rt.anchoredPosition = origin + new Vector2(Mathf.Sin(t) * amplitude.x, Mathf.Cos(t * 0.8f) * amplitude.y);
+        if (Mathf.Abs(spin) > 0.001f) rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t) * spin);
+    }
+}
+
+public class UIMote : MonoBehaviour
+{
+    private RectTransform rt;
+    private Image image;
+    private Color color;
+    private float rise;
+    private float wobble;
+    private float phase;
+
+    public void Init(float riseSpeed, float wobbleSpeed, float startPhase)
+    {
+        rt = (RectTransform)transform;
+        image = GetComponent<Image>();
+        color = image != null ? image.color : Color.white;
+        rise = riseSpeed;
+        wobble = wobbleSpeed;
+        phase = startPhase;
+    }
+
+    private void Update()
+    {
+        if (rt == null) return;
+        float dt = Time.unscaledDeltaTime;
+        Vector2 p = rt.anchoredPosition;
+        p.y += rise * dt;
+        p.x += Mathf.Sin(Time.unscaledTime * wobble + phase) * 7f * dt;
+        if (p.y > 470f)
+        {
+            p.y = -470f;
+            p.x = UnityEngine.Random.Range(-710f, 710f);
+        }
+        rt.anchoredPosition = p;
+        if (image != null)
+        {
+            float a = color.a * (0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 2.4f + phase));
+            image.color = new Color(color.r, color.g, color.b, a);
+        }
+    }
+}
+
+public class UIGrainDrift : MonoBehaviour
+{
+    private RectTransform rt;
+    private Image image;
+    private Color color;
+    private float baseAlpha;
+    private float phase;
+
+    public void Init(float alpha, float speed)
+    {
+        rt = (RectTransform)transform;
+        image = GetComponent<Image>();
+        color = image != null ? image.color : Color.white;
+        baseAlpha = alpha;
+        phase = UnityEngine.Random.value * 6.28f;
+    }
+
+    private void Update()
+    {
+        if (rt == null || image == null) return;
+        float n = Mathf.PerlinNoise(phase + Time.unscaledTime * 13f, 0.37f);
+        rt.anchoredPosition = new Vector2(n * 8f - 4f, Mathf.PerlinNoise(0.22f, phase + Time.unscaledTime * 11f) * 8f - 4f);
+        color.a = baseAlpha * (0.78f + n * 0.22f);
+        image.color = color;
     }
 }
 

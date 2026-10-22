@@ -26,6 +26,7 @@ public class RoomManager : MonoBehaviour
     private Transform doorLeaf;
     private SpriteRenderer doorLight;
     private bool openingDoor;
+    private Coroutine doorRoutine;
 
     public void Init()
     {
@@ -109,6 +110,7 @@ public class RoomManager : MonoBehaviour
         table.transform.SetParent(Root, false);
         var tableSr = table.AddComponent<SpriteRenderer>();
         tableSr.sprite = art.World("table_bg");
+        tableSr.color = new Color(0.72f, 0.69f, 0.80f, 1f);
         tableSr.sortingOrder = -3000;
         tableSr.drawMode = SpriteDrawMode.Simple;
         float tw = tableSr.sprite.bounds.size.x;
@@ -116,16 +118,28 @@ public class RoomManager : MonoBehaviour
         table.transform.localScale = new Vector3(31f / tw, 17.5f / th, 1f);
 
         string floorName = boss ? "floor_boss" : "floor";
-        AddTile(floorName, Vector3.zero, new Vector2(17.9f, 9.1f), -2000);
+        var floorSr = AddTile(floorName, Vector3.zero, new Vector2(17.9f, 9.1f), -2000);
+        floorSr.color = boss ? new Color(0.68f, 0.60f, 0.75f, 1f) : new Color(0.78f, 0.82f, 0.98f, 1f);
+        AddQuad(new Vector3(0f, 0f, 0f), new Vector2(17.9f, 9.1f),
+            boss ? new Color(0.10f, 0.04f, 0.12f, 0.14f) : new Color(0.035f, 0.07f, 0.16f, 0.12f), -1995, 0f);
+
+        // Cold gloom pooling at the edges of the arena.
+        AddQuad(new Vector3(0f, 3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.28f), -1988, 0f);
+        AddQuad(new Vector3(0f, -3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.25f), -1988, 0f);
 
         // тёмная кромка листа картона
         AddQuad(new Vector3(0f, -4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.55f), -1990, 0f);
         AddQuad(new Vector3(0f, 4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.45f), -1990, 0f);
 
-        AddTile("wall_h", new Vector3(0f, 5.05f, 0f), new Vector2(19.6f, 1.25f), -1500);
-        AddTile("wall_h", new Vector3(0f, -5.05f, 0f), new Vector2(19.6f, 1.25f), -1490);
-        AddTile("wall_v", new Vector3(-9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1480);
-        AddTile("wall_v", new Vector3(9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1470);
+        var wallTop = AddTile("wall_h", new Vector3(0f, 5.05f, 0f), new Vector2(19.6f, 1.25f), -1500);
+        var wallBottom = AddTile("wall_h", new Vector3(0f, -5.05f, 0f), new Vector2(19.6f, 1.25f), -1490);
+        var wallLeft = AddTile("wall_v", new Vector3(-9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1480);
+        var wallRight = AddTile("wall_v", new Vector3(9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1470);
+        Color wallTint = new Color(0.62f, 0.60f, 0.70f, 1f);
+        wallTop.color = wallTint;
+        wallBottom.color = wallTint;
+        wallLeft.color = wallTint;
+        wallRight.color = wallTint;
 
         // бумажный мусор
         var rng = new System.Random(index * 13 + 71);
@@ -137,6 +151,26 @@ public class RoomManager : MonoBehaviour
                 0.2f + (float)rng.NextDouble() * 0.4f), new Color(0.9f, 0.82f, 0.65f, 0.12f), -1950,
                 (float)rng.NextDouble() * 180f);
             q.transform.localScale = new Vector3(q.transform.localScale.x, q.transform.localScale.y, 1f);
+        }
+
+        AddFog(new Vector3(-3.8f, 1.2f, 0f), 7.5f, new Color(0.30f, 0.40f, 0.62f, 0.075f), 0.17f);
+        AddFog(new Vector3(3.4f, -1.6f, 0f), 6.2f, new Color(0.38f, 0.28f, 0.52f, 0.06f), 0.11f);
+        AddFog(new Vector3(0.4f, 3.2f, 0f), 5.2f, new Color(0.18f, 0.30f, 0.46f, 0.055f), 0.08f);
+        for (int i = 0; i < 22; i++)
+        {
+            var mote = new GameObject("mote");
+            mote.transform.SetParent(Root, false);
+            mote.transform.position = new Vector3(Random.Range(-8.2f, 8.2f), Random.Range(-4.2f, 4.2f), 0f);
+            var msr = mote.AddComponent<SpriteRenderer>();
+            msr.sprite = art.World("fx_mote");
+            msr.color = i % 3 == 0
+                ? new Color(0.95f, 0.66f, 0.35f, 0.35f)
+                : new Color(0.6f, 0.72f, 0.95f, 0.24f);
+            msr.sortingOrder = -450;
+            float s = Random.Range(0.05f, 0.16f);
+            mote.transform.localScale = new Vector3(s, s, 1f);
+            var drift = mote.AddComponent<MoteDrift>();
+            drift.Init(Random.Range(0.15f, 0.55f), Random.Range(0.1f, 0.5f), Random.Range(0f, 6.28f));
         }
     }
 
@@ -166,6 +200,19 @@ public class RoomManager : MonoBehaviour
         sr.sortingOrder = order;
         go.transform.localScale = new Vector3(size.x / 0.042f, size.y / 0.042f, 1f);
         return sr;
+    }
+
+    private void AddFog(Vector3 pos, float size, Color color, float speed)
+    {
+        var go = new GameObject("fog");
+        go.transform.SetParent(Root, false);
+        go.transform.position = pos;
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = Game.I.Art.World("fx_glow");
+        sr.color = color;
+        sr.sortingOrder = -700;
+        go.transform.localScale = Vector3.one * size;
+        go.AddComponent<FogDrift>().Init(sr, pos, size, color, speed);
     }
 
     private void AddTorches()
@@ -282,7 +329,9 @@ public class RoomManager : MonoBehaviour
         }
         if (WaveIndex >= CurrentRoom.Waves) return;
         var comp = Composition(Game.I.Run.RoomIndex, WaveIndex);
-        bool elite = CurrentRoom.Type == RoomType.Elite && WaveIndex == 0;
+        bool elite = CurrentRoom.Type == RoomType.Elite ||
+                     (Game.I.Run.RoomIndex >= 7 && WaveIndex >= 1 &&
+                      (Game.I.Run.RoomIndex + WaveIndex) % 2 == 0);
         WaveIndex++;
         if (waveRoutine != null) StopCoroutine(waveRoutine);
         waveRoutine = StartCoroutine(SpawnRoutine(comp, elite));
@@ -301,7 +350,7 @@ public class RoomManager : MonoBehaviour
         {
             Vector2 pos = PickSpawn();
             SpawnOne(comp[i], eliteFirst && i == 0, pos);
-            yield return new WaitForSeconds(0.15f);
+            yield return new WaitForSeconds(0.11f);
         }
         WaveSpawning = false;
         CheckClear();
@@ -334,41 +383,41 @@ public class RoomManager : MonoBehaviour
         {
             case 0:
                 if (wave == 0) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); }
-                else { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); }
+                else { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
                 break;
             case 1:
-                if (wave == 0) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); }
+                if (wave == 0) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
+                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Imp); }
                 break;
             case 2:
-                list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton);
+                list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider);
                 break;
             case 3:
-                if (wave == 0) { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); }
-                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Bomber); }
-                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
+                if (wave == 0) { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
+                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Skeleton); }
+                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
                 break;
             case 5:
                 list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider);
-                list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton);
+                list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Imp);
                 break;
             case 6:
-                if (wave == 0) { list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Boar); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
+                if (wave == 0) { list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Skeleton); }
+                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); }
                 break;
             case 8:
-                if (wave == 0) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Guard); }
-                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Shaman); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Spider); }
+                if (wave == 0) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); }
+                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Spider); }
+                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Bomber); }
                 break;
             case 9:
-                if (wave == 0) { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Shaman); }
-                else if (wave == 1) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); }
-                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Guard); }
+                if (wave == 0) { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Spider); }
+                else if (wave == 1) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
+                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Guard); list.Add(EnemyKind.Shaman); }
                 break;
             case 10:
-                if (wave == 0) { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); }
-                else { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton); }
+                if (wave == 0) { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Guard); }
+                else { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
                 break;
             default:
                 int count = 3 + wave;
@@ -465,7 +514,7 @@ public class RoomManager : MonoBehaviour
     {
         if (doorLeaf == null || openingDoor) return;
         openingDoor = true;
-        StartCoroutine(DoorRoutine());
+        doorRoutine = StartCoroutine(DoorRoutine());
     }
 
     private IEnumerator DoorRoutine()
@@ -476,16 +525,25 @@ public class RoomManager : MonoBehaviour
             doorLight.color = new Color(1f, 0.8f, 0.45f, 0.6f);
             doorLight.transform.localScale = Vector3.one * 3f;
         }
+        var leaf = doorLeaf;
+        if (leaf == null)
+        {
+            openingDoor = false;
+            doorRoutine = null;
+            yield break;
+        }
         float t = 0f;
-        Quaternion start = doorLeaf.localRotation;
+        Quaternion start = leaf.localRotation;
         Quaternion end = Quaternion.Euler(0f, 0f, -102f);
-        while (t < 0.65f)
+        while (t < 0.65f && leaf != null)
         {
             t += Time.deltaTime;
-            doorLeaf.localRotation = Quaternion.Slerp(start, end, Mathf.SmoothStep(0f, 1f, t / 0.65f));
+            if (leaf == null) break;
+            leaf.localRotation = Quaternion.Slerp(start, end, Mathf.SmoothStep(0f, 1f, t / 0.65f));
             yield return null;
         }
-        Game.I.Fx.Dust(doorLeaf.position, 5, 1.1f);
+        if (leaf != null && Game.I != null && Game.I.Fx != null) Game.I.Fx.Dust(leaf.position, 5, 1.1f);
+        doorRoutine = null;
     }
 
     public Vector2 Move(Vector2 pos, Vector2 delta, float radius)
@@ -588,6 +646,11 @@ public class RoomManager : MonoBehaviour
     private void ClearRoom()
     {
         CloseCombat();
+        if (doorRoutine != null)
+        {
+            StopCoroutine(doorRoutine);
+            doorRoutine = null;
+        }
         Projectile.ClearAll();
         foreach (var a in FindObjectsOfType<Ally>()) Destroy(a.gameObject);
         foreach (var h in FindObjectsOfType<Hazard>()) Destroy(h.gameObject);
@@ -654,5 +717,69 @@ public class GlowPulse : MonoBehaviour
         float a = 0.22f + Mathf.Sin(Time.time * 1.7f + seed) * 0.08f;
         sr.color = new Color(1f, 0.8f, 0.35f, a);
         transform.localScale = Vector3.one * (1.3f + Mathf.Sin(Time.time * 1.3f + seed) * 0.08f);
+    }
+}
+
+public class FogDrift : MonoBehaviour
+{
+    private SpriteRenderer sr;
+    private Vector3 origin;
+    private float size;
+    private Color color;
+    private float speed;
+    private float seed;
+
+    public void Init(SpriteRenderer renderer, Vector3 start, float scale, Color tint, float driftSpeed)
+    {
+        sr = renderer;
+        origin = start;
+        size = scale;
+        color = tint;
+        speed = driftSpeed;
+        seed = Random.value * 6.28f;
+    }
+
+    private void Update()
+    {
+        if (sr == null) return;
+        float t = Time.time * speed + seed;
+        transform.position = origin + new Vector3(Mathf.Sin(t * 1.7f) * 3.2f + Mathf.Cos(t * 0.7f) * 1.1f,
+            Mathf.Cos(t * 1.3f) * 0.55f, 0f);
+        float pulse = 0.7f + Mathf.Sin(t * 1.9f) * 0.3f;
+        sr.color = new Color(color.r, color.g, color.b, color.a * pulse);
+        float s = size * (1f + Mathf.Sin(t * 1.1f) * 0.06f);
+        transform.localScale = new Vector3(s, s * 0.72f, 1f);
+    }
+}
+
+public class MoteDrift : MonoBehaviour
+{
+    private Vector3 origin;
+    private float speed;
+    private float rise;
+    private float seed;
+    private SpriteRenderer sr;
+    private Color color;
+
+    public void Init(float driftSpeed, float riseSpeed, float phase)
+    {
+        origin = transform.position;
+        speed = driftSpeed;
+        rise = riseSpeed;
+        seed = phase;
+        sr = GetComponent<SpriteRenderer>();
+        if (sr != null) color = sr.color;
+    }
+
+    private void Update()
+    {
+        float t = Time.time * speed + seed;
+        transform.position = origin + new Vector3(Mathf.Sin(t * 1.3f) * 1.1f, Mathf.Sin(t * 0.8f) * 0.55f, 0f);
+        if (sr != null)
+        {
+            float a = color.a * (0.55f + Mathf.Sin(t * 2.7f) * 0.45f);
+            sr.color = new Color(color.r, color.g, color.b, a);
+        }
+        transform.position += Vector3.up * (Mathf.Sin(t * 0.45f) * rise * Time.deltaTime);
     }
 }

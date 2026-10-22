@@ -128,7 +128,7 @@ public static class Data
             "icon_nova", Pal.Teal),
         new SkillDef("chain", "ЦЕПНАЯ МОЛНИЯ", "Молния бьёт до трёх врагов, урон падает с каждым прыжком.", 8f,
             "icon_chain", Pal.Gold),
-        new SkillDef("heal", "ИСЦЕЛЕНИЕ", "Восстанавливает 35% максимального здоровья.", 15f,
+        new SkillDef("heal", "ИСЦЕЛЕНИЕ", "Восстанавливает 30% максимального здоровья.", 15f,
             "icon_heal", Pal.Red),
         new SkillDef("poison", "ЯДОВИТОЕ ОБЛАКО", "Лужа яда на месте ближайшего врага. Держится 6 секунд.", 9f,
             "icon_poison", Pal.Green),
@@ -142,31 +142,31 @@ public static class Data
             "icon_clock", Pal.Purple),
         new SkillDef("golem", "КАРТОННЫЙ ГОЛЕМ", "Голем сражается на вашей стороне 12 секунд.", 20f,
             "icon_golem", Pal.Paper),
-        new SkillDef("rage", "БЕРСЕРК", "6 секунд: +50% урона и +30% скорости атаки.", 18f,
+        new SkillDef("rage", "БЕРСЕРК", "6 секунд: +50% урона и +39% скорости атаки.", 18f,
             "icon_rage", Pal.RedDeep)
     };
 
     public static readonly List<PerkDef> Perks = new List<PerkDef>
     {
         new PerkDef("damage", "ОСТРЫЙ КРАЙ", "+18% урона автоатаки.", "icon_perk_damage", false, 1.2f),
-        new PerkDef("attackspeed", "БЫСТРЫЕ РУКИ", "+14% скорости автоатаки.", "icon_perk_speed", false, 1.1f),
+        new PerkDef("attackspeed", "БЫСТРЫЕ РУКИ", "+16% скорости автоатаки.", "icon_perk_speed", false, 1.1f),
         new PerkDef("movespeed", "ЛЁГКИЕ НОГИ", "+8% скорости передвижения.", "icon_perk_speed", false, 1.0f),
-        new PerkDef("hp", "ПЛОТНАЯ БУМАГА", "+25 к максимальному здоровью и лечение на 25.", "icon_perk_hp", false, 1.1f),
-        new PerkDef("lifesteal", "ВАМПИРИЗМ", "6% нанесённого урона возвращается здоровьем.", "icon_perk_lifesteal", false, 0.9f),
-        new PerkDef("crit", "МЕТКА РОКА", "+12% шанс крита. Крит наносит 180% урона.", "icon_perk_crit", false, 1.0f),
+        new PerkDef("hp", "ПЛОТНАЯ БУМАГА", "+20 к максимальному здоровью и лечение на 20.", "icon_perk_hp", false, 1.1f),
+        new PerkDef("lifesteal", "ВАМПИРИЗМ", "5% нанесённого урона возвращается здоровьем.", "icon_perk_lifesteal", false, 0.9f),
+        new PerkDef("crit", "МЕТКА РОКА", "+10% шанс крита. Крит наносит 180% урона.", "icon_perk_crit", false, 1.0f),
         new PerkDef("pierce", "ПРОБОЙ", "Снаряды автоатаки пробивают +1 врага.", "icon_perk_pierce", false, 0.9f),
         new PerkDef("multi", "ВЕЕР", "+1 снаряд в автоатаке.", "icon_perk_multi", false, 0.8f),
         new PerkDef("bomb", "ВЗРЫВНАЯ КОНЧИНА", "Побеждённые враги взрываются и бьют соседей.", "icon_perk_bomb", false, 0.7f),
-        new PerkDef("shieldstart", "БУМАЖНЫЙ БАРЬЕР", "В начале каждой комнаты даётся щит на 15.", "icon_perk_shield", false, 0.9f),
+        new PerkDef("shieldstart", "БУМАЖНЫЙ БАРЬЕР", "В начале каждой комнаты даётся щит на 10.", "icon_perk_shield", false, 0.9f),
         new PerkDef("cdr", "УСКОРЕНИЕ КАСТА", "-15% перезарядки навыков.", "icon_perk_cd", false, 1.0f),
         new PerkDef("slot", "НОВЫЙ СЛОТ", "+1 слот навыка и выбор нового навыка.", "icon_perk_slot", true, 0.55f),
         new PerkDef("freeze", "ИНЕЙ НА КОНЧИКЕ", "Автоатака замедляет врагов на 1 секунду.", "icon_perk_freeze", false, 0.8f),
         new PerkDef("poison", "ТОКСИЧНАЯ КРАСКА", "Автоатака отравляет врагов на 3 секунды.", "icon_perk_poison", false, 0.8f),
-        new PerkDef("thorns", "ШИПЫ", "Атакующий получает 10 урона.", "icon_perk_thorns", false, 0.8f),
-        new PerkDef("healroom", "ПЕРЕДЫШКА", "После каждой комнаты восстанавливается 15% здоровья.", "icon_perk_heal", false, 0.7f),
+        new PerkDef("thorns", "ШИПЫ", "Атакующий получает 8 урона.", "icon_perk_thorns", false, 0.8f),
+        new PerkDef("healroom", "ПЕРЕДЫШКА", "После каждой комнаты восстанавливается 12% здоровья.", "icon_perk_heal", false, 0.7f),
         new PerkDef("secondwind", "ВТОРОЕ ДЫХАНИЕ", "Один раз за забег смертельный удар оставляет 1 HP и щит.", "icon_perk_phoenix", true, 0.45f),
         new PerkDef("skillpower", "СИЛЬНАЯ МАГИЯ", "+25% урона навыков.", "icon_perk_armor", false, 0.9f),
-        new PerkDef("armor", "ПЛОТНЫЙ КАРТОН", "-10% получаемого урона.", "icon_perk_armor", false, 0.85f)
+        new PerkDef("armor", "ПЛОТНЫЙ КАРТОН", "-8% получаемого урона.", "icon_perk_armor", false, 0.85f)
     };
 
     public static readonly Dictionary<EnemyKind, EnemyDef> Enemies = new Dictionary<EnemyKind, EnemyDef>
@@ -174,42 +174,42 @@ public static class Data
         [EnemyKind.Imp] = new EnemyDef
         {
             Kind = EnemyKind.Imp, Name = "БУМАЖНЫЙ БЕС", Sprite = "imp",
-            Hp = 16, Speed = 3.1f, Damage = 8, Range = 0.95f, Cooldown = 1.15f, Scale = 1.0f
+            Hp = 24, Speed = 3.45f, Damage = 11, Range = 0.95f, Cooldown = 1.05f, Scale = 1.0f
         },
         [EnemyKind.Skeleton] = new EnemyDef
         {
             Kind = EnemyKind.Skeleton, Name = "СКЕЛЕТ-ЛУЧНИК", Sprite = "skeleton",
-            Hp = 22, Speed = 2.25f, Damage = 7, Range = 5.2f, Cooldown = 2.0f, Scale = 1.0f
+            Hp = 34, Speed = 2.45f, Damage = 10, Range = 5.2f, Cooldown = 1.85f, Scale = 1.0f
         },
         [EnemyKind.Boar] = new EnemyDef
         {
             Kind = EnemyKind.Boar, Name = "КАРТОННЫЙ КАБАН", Sprite = "boar",
-            Hp = 42, Speed = 2.5f, Damage = 14, Range = 5.0f, Cooldown = 3.2f, Scale = 1.05f
+            Hp = 62, Speed = 2.85f, Damage = 19, Range = 5.0f, Cooldown = 2.9f, Scale = 1.05f
         },
         [EnemyKind.Bomber] = new EnemyDef
         {
             Kind = EnemyKind.Bomber, Name = "БОМБЕР", Sprite = "bomber",
-            Hp = 18, Speed = 2.7f, Damage = 26, Range = 1.8f, Cooldown = 1.6f, Scale = 1.0f
+            Hp = 28, Speed = 3.0f, Damage = 40, Range = 1.8f, Cooldown = 1.5f, Scale = 1.0f
         },
         [EnemyKind.Guard] = new EnemyDef
         {
             Kind = EnemyKind.Guard, Name = "СТРАЖ-ЩИТОНОСЕЦ", Sprite = "guard",
-            Hp = 64, Speed = 1.55f, Damage = 12, Range = 1.2f, Cooldown = 1.7f, Scale = 1.08f
+            Hp = 105, Speed = 1.7f, Damage = 18, Range = 1.2f, Cooldown = 1.55f, Scale = 1.08f
         },
         [EnemyKind.Shaman] = new EnemyDef
         {
             Kind = EnemyKind.Shaman, Name = "ШАМАН", Sprite = "shaman",
-            Hp = 28, Speed = 1.9f, Damage = 6, Range = 6.5f, Cooldown = 2.7f, Scale = 1.0f
+            Hp = 44, Speed = 2.15f, Damage = 9, Range = 6.5f, Cooldown = 2.45f, Scale = 1.0f
         },
         [EnemyKind.Spider] = new EnemyDef
         {
             Kind = EnemyKind.Spider, Name = "ПАУК", Sprite = "spider",
-            Hp = 14, Speed = 3.7f, Damage = 6, Range = 0.95f, Cooldown = 0.85f, Scale = 0.92f
+            Hp = 19, Speed = 4.05f, Damage = 8, Range = 0.95f, Cooldown = 0.78f, Scale = 0.92f
         },
         [EnemyKind.Lich] = new EnemyDef
         {
             Kind = EnemyKind.Lich, Name = "ЛИЧ-ПЕРЕПЛЁТ", Sprite = "lich",
-            Hp = 760, Speed = 1.35f, Damage = 16, Range = 8f, Cooldown = 2.3f, Scale = 1.45f
+            Hp = 1180, Speed = 1.5f, Damage = 24, Range = 8f, Cooldown = 2.1f, Scale = 1.45f
         }
     };
 

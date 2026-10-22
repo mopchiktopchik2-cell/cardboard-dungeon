@@ -70,6 +70,7 @@ public class Enemy : MonoBehaviour
 
         baseTint = elite ? new Color(1f, 0.92f, 0.7f) : Color.white;
         Visual = PaperActor.Create(transform, Game.I.Art, Def.Sprite, scale, baseTint, true, false);
+        Visual.StepDust = Boss || elite;
         Visual.Main.sortingOrder = 1000;
         Visual.SpawnPop(0.4f);
         if (elite) Visual.AddAura(Game.I.Art, Pal.Gold, 1.35f);
@@ -189,7 +190,7 @@ public class Enemy : MonoBehaviour
     private void UpdateBar()
     {
         if (Bar == null || Boss) return;
-        float h = Visual.Main.sprite.bounds.size.y * (Visual.transform.localScale.y) + 0.22f;
+        float h = Visual.Main.sprite.bounds.size.y * Visual.SpriteScale + 0.22f;
         Bar.Set(Hp / MaxHp, h);
         if (!BarVisible() && Hp < MaxHp) SetBar(true);
     }
@@ -218,6 +219,7 @@ public class Enemy : MonoBehaviour
                 attackCd = Def.Cooldown;
                 if (dist < Def.Range + 0.45f)
                 {
+                    Visual.Attack(dir, 1.25f);
                     player.TakeDamage(Damage, transform.position, false, false, this);
                     Game.I.Fx.Slash(player.transform.position, dir);
                     Game.I.Audio.Play("sfx_hit", 0.5f);
@@ -238,8 +240,8 @@ public class Enemy : MonoBehaviour
             if (attackCd <= 0f)
             {
                 winding = true;
-                windup = 0.34f;
-                Visual.Pulse(0.12f, 0.18f);
+                windup = 0.3f;
+                Visual.Windup(windup);
                 Visual.Flash(new Color(1f, 0.55f, 0.5f), 0.18f);
             }
         }
@@ -254,7 +256,7 @@ public class Enemy : MonoBehaviour
             {
                 winding = false;
                 attackCd = Def.Cooldown;
-                Shoot(player, dir, "proj_arrow", 9.2f, 1.0f);
+                Shoot(player, dir, "proj_arrow", 10.2f, 1.0f);
             }
             return;
         }
@@ -277,7 +279,8 @@ public class Enemy : MonoBehaviour
         if (attackCd <= 0f && dist < 7f)
         {
             winding = true;
-            windup = 0.42f;
+            windup = 0.36f;
+            Visual.Windup(windup);
             Visual.Flash(new Color(0.9f, 0.85f, 0.7f), 0.2f);
         }
     }
@@ -293,12 +296,13 @@ public class Enemy : MonoBehaviour
                 attackCd = Def.Cooldown;
                 if (specialCd <= 0f)
                 {
-                    specialCd = 6.5f;
+                    specialCd = 8f;
                     HealAllies();
                 }
                 else
                 {
-                    Shoot(player, dir, "proj_skull", 7.5f, 1.0f);
+                    Visual.Attack(dir, 0.85f);
+                    Shoot(player, dir, "proj_skull", 8.2f, 1.0f);
                     Game.I.Audio.Play("sfx_cast", 0.5f);
                 }
             }
@@ -313,7 +317,12 @@ public class Enemy : MonoBehaviour
             MoveDir(side * (Mathf.Sin(Time.time * 0.8f) > 0f ? 1f : -1f), 0.4f, dt);
         }
 
-        if (attackCd <= 0f) winding = true;
+        if (attackCd <= 0f)
+        {
+            winding = true;
+            windup = 0.5f;
+            Visual.Windup(windup);
+        }
     }
 
     private void HealAllies()
@@ -325,15 +334,8 @@ public class Enemy : MonoBehaviour
             if (e == null || e.Dead || e == this) continue;
             if (Vector2.Distance(e.transform.position, transform.position) < 6f)
             {
-                e.Heal(e.MaxHp * 0.12f);
+                e.Heal(e.MaxHp * 0.08f);
                 Game.I.Fx.Heal(e.transform.position);
-            }
-        }
-        foreach (var e in Game.I.Rooms.Enemies)
-        {
-            if (e != null && !e.Dead && Vector2.Distance(e.transform.position, transform.position) < 6f)
-            {
-                e.Damage *= 1.08f;
             }
         }
     }
@@ -375,9 +377,10 @@ public class Enemy : MonoBehaviour
                 winding = false;
                 dashing = true;
                 dashHit = false;
-                dashTime = 0.48f;
+                dashTime = 0.52f;
                 dashDir = dir;
                 attackCd = Def.Cooldown;
+                Visual.Attack(dir, 1.5f);
                 Game.I.Audio.Play("sfx_dash", 0.6f);
             }
             return;
@@ -386,7 +389,8 @@ public class Enemy : MonoBehaviour
         if (dist < 5f && attackCd <= 0f)
         {
             winding = true;
-            windup = 0.55f;
+            windup = 0.48f;
+            Visual.Windup(windup);
             Visual.Flash(new Color(1f, 0.55f, 0.45f), 0.5f);
             Game.I.Fx.Ring(transform.position, new Color(1f, 0.4f, 0.3f, 0.8f), 1.0f, 0.5f);
             return;
@@ -401,7 +405,7 @@ public class Enemy : MonoBehaviour
             fuse -= dt;
             beepTimer -= dt;
             float k = 1f - Mathf.Clamp01(fuse / 1.15f);
-            Visual.transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.time * 22f) * 0.08f + k * 0.12f);
+            Visual.SetCharge(0.12f + Mathf.Sin(Time.time * 22f) * 0.08f + k * 0.12f);
             if (beepTimer <= 0f)
             {
                 beepTimer = Mathf.Lerp(0.18f, 0.05f, k);
@@ -477,11 +481,15 @@ public class Enemy : MonoBehaviour
     {
         casting = true;
         Visual.Pulse(0.08f, 0.25f);
+        Vector2 castDir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
+        Visual.Face(castDir.x);
+        Visual.Windup(0.45f);
         Game.I.Fx.Ring(transform.position, new Color(0.7f, 0.4f, 0.9f, 0.7f), 1.6f, 0.35f);
 
         if (which == 0)
         {
             yield return new WaitForSeconds(0.5f);
+            Visual.Attack(castDir, 1f);
             int count = phase2 ? 14 : 9;
             for (int i = 0; i < count; i++)
             {
@@ -495,6 +503,7 @@ public class Enemy : MonoBehaviour
         else if (which == 1)
         {
             yield return new WaitForSeconds(0.55f);
+            Visual.Attack(castDir, 0.8f);
             int adds = phase2 ? 3 : 2;
             Game.I.Rooms.SpawnAdds(adds);
             Game.I.Fx.Explosion(transform.position, 1.6f, new Color(0.7f, 0.5f, 0.9f));
@@ -503,6 +512,7 @@ public class Enemy : MonoBehaviour
         else if (which == 2)
         {
             yield return new WaitForSeconds(0.45f);
+            Visual.Attack(castDir, 1f);
             int count = phase2 ? 5 : 4;
             for (int i = 0; i < count; i++)
             {
@@ -593,7 +603,7 @@ public class Enemy : MonoBehaviour
     {
         if (Dead) return;
         Hp = Mathf.Min(MaxHp, Hp + amount);
-        if (Bar != null) Bar.Set(Hp / MaxHp, Visual.Main.sprite.bounds.size.y * Visual.transform.localScale.y + 0.22f);
+        if (Bar != null) Bar.Set(Hp / MaxHp, Visual.Main.sprite.bounds.size.y * Visual.SpriteScale + 0.22f);
     }
 
     public void Slow(float duration, float factor = 0.5f)
@@ -623,7 +633,8 @@ public class Enemy : MonoBehaviour
         }
         if (Bar != null && !BarVisible()) SetBar(true);
         Visual.Flash(crit ? new Color(1f, 0.9f, 0.55f) : new Color(1f, 0.75f, 0.7f), 0.1f);
-        Game.I.Fx.FloatingText(transform.position + Vector3.up * (1.5f * Visual.transform.localScale.y),
+        Visual.Hit((Vector2)transform.position - source, crit ? 1.3f : 0.8f);
+        Game.I.Fx.FloatingText(transform.position + Vector3.up * (1.5f * Visual.SpriteScale),
             Mathf.RoundToInt(amount).ToString(), crit ? new Color(1f, 0.85f, 0.35f) : Pal.Cream,
             crit ? 1.35f : 0.9f, crit);
         if (playerSource && !crit) Game.I.Hitstop(0.012f);

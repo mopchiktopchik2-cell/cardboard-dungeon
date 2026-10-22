@@ -232,6 +232,10 @@ public class Game : MonoBehaviour
     private IEnumerator ClearRoutine()
     {
         yield return WaitReal(1.1f);
+        if (State != GameState.Clear || Player == null || Player.Dead)
+        {
+            yield break;
+        }
         if (Run.RoomIndex >= Data.RoomCount - 1)
         {
             Victory();
@@ -242,6 +246,7 @@ public class Game : MonoBehaviour
 
     public void OfferPerks(string title)
     {
+        if (Player == null || Player.Dead || State == GameState.Dead) return;
         State = GameState.Perk;
         Time.timeScale = 0f;
         var perks = Run.RollPerks(3);
@@ -283,7 +288,7 @@ public class Game : MonoBehaviour
         Time.timeScale = 1f;
         if (heal)
         {
-            Player.Heal(Player.Stats.maxHp * 0.35f);
+            Player.Heal(Player.Stats.maxHp * 0.28f);
             Fx.Heal(Player.transform.position);
             Audio.Play("sfx_heal", 0.8f);
             ContinueAfterChoice();
@@ -327,16 +332,20 @@ public class Game : MonoBehaviour
         Player.SetControl(false);
         Rooms.CloseCombat();
         yield return WaitReal(0.25f);
+        if (State == GameState.Dead) yield break;
 
         // маг идёт к двери
         yield return Player.WalkTo(Rooms.RightDoorPosition, 0.9f);
+        if (State == GameState.Dead) yield break;
         Rooms.OpenDoor();
         Audio.Play("sfx_door", 0.8f);
         Cam.Shake(0.08f, 0.3f);
         yield return WaitReal(0.35f);
+        if (State == GameState.Dead) yield break;
 
         // бумажный занавес
         yield return UI.Wipe(true, 0.45f);
+        if (State == GameState.Dead) yield break;
         Run.RoomIndex++;
         Rooms.BuildRoom(Run.RoomIndex, false);
         Debug.Log("[Cardboard] Enter room " + (Run.RoomIndex + 1) + " / " + Data.RoomCount +
@@ -391,6 +400,8 @@ public class Game : MonoBehaviour
 
     public void Victory()
     {
+        if (State == GameState.Dead || State == GameState.Victory) return;
+        StopFlow();
         State = GameState.Victory;
         Time.timeScale = 0f;
         UI.ShowBossBar(false);
@@ -403,6 +414,7 @@ public class Game : MonoBehaviour
     public void PlayerDied()
     {
         if (State == GameState.Dead || State == GameState.Victory) return;
+        StopFlow();
         State = GameState.Dead;
         Time.timeScale = 0f;
         UI.ShowBossBar(false);

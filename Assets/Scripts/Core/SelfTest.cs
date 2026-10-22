@@ -156,6 +156,12 @@ public static class SelfTest
         Check(ArtExists("prop_campfire"), "campfire exists");
         Check(ArtExists("fx_slash"), "slash effect exists");
         Check(ArtExists("fx_glow"), "glow effect exists");
+        Check(ArtExists("ui_menu_bg"), "v1.1 menu backdrop exists");
+        Check(ArtExists("ui_menu_frame"), "v1.1 menu frame exists");
+        Check(ArtExists("ui_rune"), "v1.1 rune exists");
+        Check(ArtExists("ui_divider"), "v1.1 divider exists");
+        Check(ArtExists("fx_ember"), "ember particle exists");
+        Check(ArtExists("fx_mote"), "ambient mote exists");
 
         Check(Resources.Load<Font>("Fonts/PT_Serif-Bold") != null, "PT Serif Bold font exists");
         Check(Resources.Load<Font>("Fonts/PT_Sans-Regular") != null, "PT Sans Regular font exists");
@@ -176,13 +182,15 @@ public static class SelfTest
         Check(Data.Perks.Count >= 15, "enough perk variety");
         Check(Data.RoomCount > 8, "long enough run");
 
-        float playerDps = 10f / 0.7f;
+        var baseStats = new PlayerStats();
+        float playerDps = baseStats.damage / baseStats.attackInterval;
         var imp = Data.Enemy(EnemyKind.Imp);
         var guard = Data.Enemy(EnemyKind.Guard);
         var lich = Data.Enemy(EnemyKind.Lich);
-        Check(imp.Hp / playerDps < 3f, "first enemies die quickly");
-        Check(guard.Hp > imp.Hp, "guard is tougher than imp");
-        Check(lich.Hp / playerDps > 25f, "boss takes a real fight");
+        Check(imp.Hp / playerDps > 1.2f && imp.Hp / playerDps < 3f, "first enemies take a few shots");
+        Check(guard.Hp > imp.Hp * 3f, "guard is much tougher than imp");
+        Check(lich.Hp / playerDps > 60f, "boss takes a real fight");
+        Check(Data.Enemy(EnemyKind.Spider).Speed > imp.Speed, "spiders are the fastest basic enemy");
     }
 
     private static bool ArtExists(string name)

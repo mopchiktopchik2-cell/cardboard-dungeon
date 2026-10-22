@@ -11,8 +11,8 @@ public class RunManager : MonoBehaviour
     public readonly Dictionary<string, int> PerkCounts = new Dictionary<string, int>();
     public readonly List<PerkDef> TakenPerks = new List<PerkDef>();
 
-    public float EnemyHpScale => 1f + RoomIndex * 0.12f;
-    public float EnemyDamageScale => 1f + RoomIndex * 0.075f;
+    public float EnemyHpScale => 1f + RoomIndex * 0.16f;
+    public float EnemyDamageScale => 1f + RoomIndex * 0.10f;
 
     public void Init()
     {
@@ -65,8 +65,8 @@ public class RunManager : MonoBehaviour
             {
                 int owned = PerkCounts.TryGetValue(perk.Id, out var c) ? c : 0;
                 if (owned > 0) continue;
-                if (perk.Id == "slot" && Game.I.Skills.MaxSlots >= Data.MaxSkillSlots) continue;
             }
+            if (IsPerkCapped(perk)) continue;
             candidates.Add(perk);
         }
 
@@ -113,7 +113,7 @@ public class RunManager : MonoBehaviour
     {
         if (perk == null) return false;
         if (perk.Unique && PerkCounts.TryGetValue(perk.Id, out var owned) && owned > 0) return false;
-        if (perk.Id == "slot" && Game.I.Skills.MaxSlots >= Data.MaxSkillSlots) return false;
+        if (IsPerkCapped(perk)) return false;
 
         PerkCounts[perk.Id] = (PerkCounts.TryGetValue(perk.Id, out var c) ? c : 0) + 1;
         TakenPerks.Add(perk);
@@ -130,14 +130,14 @@ public class RunManager : MonoBehaviour
                 s.speed *= 1.08f;
                 break;
             case "hp":
-                s.maxHp += 25f;
-                Game.I.Player.Heal(25f);
+                s.maxHp += 20f;
+                Game.I.Player.Heal(20f);
                 break;
             case "lifesteal":
-                s.lifesteal += 0.06f;
+                s.lifesteal += 0.05f;
                 break;
             case "crit":
-                s.critChance = Mathf.Min(0.75f, s.critChance + 0.12f);
+                s.critChance = Mathf.Min(0.75f, s.critChance + 0.10f);
                 break;
             case "pierce":
                 s.pierce += 1;
@@ -149,7 +149,7 @@ public class RunManager : MonoBehaviour
                 s.killBombs = true;
                 break;
             case "shieldstart":
-                s.startShield += 15f;
+                s.startShield += 10f;
                 break;
             case "cdr":
                 s.cdr = Mathf.Min(0.55f, s.cdr + 0.15f);
@@ -164,10 +164,10 @@ public class RunManager : MonoBehaviour
                 s.poisonShot = true;
                 break;
             case "thorns":
-                s.thorns += 10f;
+                s.thorns += 8f;
                 break;
             case "healroom":
-                s.roomHeal += 0.15f;
+                s.roomHeal += 0.12f;
                 break;
             case "secondwind":
                 s.secondWind = true;
@@ -176,11 +176,32 @@ public class RunManager : MonoBehaviour
                 s.skillPower += 0.25f;
                 break;
             case "armor":
-                s.damageReduction = Mathf.Min(0.5f, s.damageReduction + 0.1f);
+                s.damageReduction = Mathf.Min(0.4f, s.damageReduction + 0.08f);
                 break;
         }
         Game.I.UI.RefreshSkills();
         return true;
+    }
+
+    private bool IsPerkCapped(PerkDef perk)
+    {
+        if (Game.I == null || Game.I.Player == null || Game.I.Player.Stats == null) return false;
+        var s = Game.I.Player.Stats;
+        var skills = Game.I.Skills;
+        switch (perk.Id)
+        {
+            case "attackspeed": return s.attackInterval <= 0.181f;
+            case "crit": return s.critChance >= 0.749f;
+            case "multi": return s.multishot >= 5;
+            case "cdr": return s.cdr >= 0.549f;
+            case "armor": return s.damageReduction >= 0.399f;
+            case "bomb": return s.killBombs;
+            case "freeze": return s.freezeShot;
+            case "poison": return s.poisonShot;
+            case "secondwind": return s.secondWind;
+            case "slot": return skills != null && skills.MaxSlots >= Data.MaxSkillSlots;
+        }
+        return false;
     }
 
     public void SaveRecord()

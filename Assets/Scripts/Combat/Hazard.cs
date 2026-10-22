@@ -33,6 +33,7 @@ public class Hazard : MonoBehaviour
 
     private void Update()
     {
+        if (Game.I == null || Game.I.State != GameState.Combat) return;
         age += Time.deltaTime;
         tick -= Time.deltaTime;
         if (tick <= 0f)

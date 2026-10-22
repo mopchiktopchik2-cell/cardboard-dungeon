@@ -157,7 +157,7 @@ public class SkillSystem : MonoBehaviour
             case "heal":
             {
                 if (player.Stats.hp >= player.Stats.maxHp - 1f) return false;
-                player.Heal(player.Stats.maxHp * 0.35f);
+                player.Heal(player.Stats.maxHp * 0.30f);
                 Game.I.Fx.Heal(pos);
                 Game.I.Audio.Play("sfx_heal", 0.8f);
                 return true;

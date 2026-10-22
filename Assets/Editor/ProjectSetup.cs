@@ -17,7 +17,7 @@ namespace Cardboard.EditorTools
         {
             PlayerSettings.productName = "Картонное подземелье";
             PlayerSettings.companyName = "Mopch";
-            PlayerSettings.bundleVersion = "1.0.0";
+            PlayerSettings.bundleVersion = "1.1.0";
             PlayerSettings.defaultScreenWidth = 1600;
             PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
