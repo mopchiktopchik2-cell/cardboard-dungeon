@@ -1,0 +1,206 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RunManager : MonoBehaviour
+{
+    public int RoomIndex;
+    public int Kills;
+    public float DamageDealt;
+    public float DamageTaken;
+    public float RunTime;
+    public readonly Dictionary<string, int> PerkCounts = new Dictionary<string, int>();
+    public readonly List<PerkDef> TakenPerks = new List<PerkDef>();
+
+    public float EnemyHpScale => 1f + RoomIndex * 0.12f;
+    public float EnemyDamageScale => 1f + RoomIndex * 0.075f;
+
+    public void Init()
+    {
+    }
+
+    private void Update()
+    {
+        if (Game.I != null && Game.I.InRun && Game.I.State != GameState.Pause)
+        {
+            RunTime += Time.deltaTime;
+        }
+    }
+
+    public void StartRun()
+    {
+        RoomIndex = 0;
+        Kills = 0;
+        DamageDealt = 0f;
+        DamageTaken = 0f;
+        RunTime = 0f;
+        PerkCounts.Clear();
+        TakenPerks.Clear();
+        Game.I.Player.ResetForRun();
+        Game.I.Skills.ResetForRun();
+        Game.I.UI.RefreshRoom();
+        Game.I.UI.RefreshSkills();
+    }
+
+    public void OnKill(Enemy enemy)
+    {
+        Kills++;
+    }
+
+    public void OnRoomCleared()
+    {
+        var p = Game.I.Player;
+        if (p.Stats.roomHeal > 0f)
+        {
+            p.Heal(p.Stats.maxHp * p.Stats.roomHeal);
+            Game.I.Fx.Heal(p.transform.position);
+        }
+    }
+
+    public List<PerkDef> RollPerks(int count)
+    {
+        var candidates = new List<PerkDef>();
+        foreach (var perk in Data.Perks)
+        {
+            if (perk.Unique)
+            {
+                int owned = PerkCounts.TryGetValue(perk.Id, out var c) ? c : 0;
+                if (owned > 0) continue;
+                if (perk.Id == "slot" && Game.I.Skills.MaxSlots >= Data.MaxSkillSlots) continue;
+            }
+            candidates.Add(perk);
+        }
+
+        var result = new List<PerkDef>();
+        for (int n = 0; n < count && candidates.Count > 0; n++)
+        {
+            float total = 0f;
+            foreach (var c in candidates) total += c.Weight;
+            float roll = Random.value * total;
+            PerkDef picked = candidates[candidates.Count - 1];
+            foreach (var c in candidates)
+            {
+                roll -= c.Weight;
+                if (roll <= 0f)
+                {
+                    picked = c;
+                    break;
+                }
+            }
+            result.Add(picked);
+            candidates.Remove(picked);
+        }
+        return result;
+    }
+
+    public List<SkillDef> RollSkills(int count)
+    {
+        var candidates = new List<SkillDef>();
+        foreach (var s in Data.Skills)
+        {
+            if (!Game.I.Skills.HasSkill(s.Id)) candidates.Add(s);
+        }
+        var result = new List<SkillDef>();
+        for (int i = 0; i < count && candidates.Count > 0; i++)
+        {
+            int idx = Random.Range(0, candidates.Count);
+            result.Add(candidates[idx]);
+            candidates.RemoveAt(idx);
+        }
+        return result;
+    }
+
+    public bool AddPerk(PerkDef perk)
+    {
+        if (perk == null) return false;
+        if (perk.Unique && PerkCounts.TryGetValue(perk.Id, out var owned) && owned > 0) return false;
+        if (perk.Id == "slot" && Game.I.Skills.MaxSlots >= Data.MaxSkillSlots) return false;
+
+        PerkCounts[perk.Id] = (PerkCounts.TryGetValue(perk.Id, out var c) ? c : 0) + 1;
+        TakenPerks.Add(perk);
+        var s = Game.I.Player.Stats;
+        switch (perk.Id)
+        {
+            case "damage":
+                s.damage *= 1.18f;
+                break;
+            case "attackspeed":
+                s.attackInterval = Mathf.Max(0.18f, s.attackInterval * 0.86f);
+                break;
+            case "movespeed":
+                s.speed *= 1.08f;
+                break;
+            case "hp":
+                s.maxHp += 25f;
+                Game.I.Player.Heal(25f);
+                break;
+            case "lifesteal":
+                s.lifesteal += 0.06f;
+                break;
+            case "crit":
+                s.critChance = Mathf.Min(0.75f, s.critChance + 0.12f);
+                break;
+            case "pierce":
+                s.pierce += 1;
+                break;
+            case "multi":
+                s.multishot = Mathf.Min(5, s.multishot + 1);
+                break;
+            case "bomb":
+                s.killBombs = true;
+                break;
+            case "shieldstart":
+                s.startShield += 15f;
+                break;
+            case "cdr":
+                s.cdr = Mathf.Min(0.55f, s.cdr + 0.15f);
+                break;
+            case "slot":
+                Game.I.Skills.UnlockSlot();
+                break;
+            case "freeze":
+                s.freezeShot = true;
+                break;
+            case "poison":
+                s.poisonShot = true;
+                break;
+            case "thorns":
+                s.thorns += 10f;
+                break;
+            case "healroom":
+                s.roomHeal += 0.15f;
+                break;
+            case "secondwind":
+                s.secondWind = true;
+                break;
+            case "skillpower":
+                s.skillPower += 0.25f;
+                break;
+            case "armor":
+                s.damageReduction = Mathf.Min(0.5f, s.damageReduction + 0.1f);
+                break;
+        }
+        Game.I.UI.RefreshSkills();
+        return true;
+    }
+
+    public void SaveRecord()
+    {
+        int bestRoom = PlayerPrefs.GetInt("best_room", 0);
+        int bestKills = PlayerPrefs.GetInt("best_kills", 0);
+        int reached = RoomIndex + 1;
+        if (reached > bestRoom)
+        {
+            bestRoom = reached;
+            PlayerPrefs.SetInt("best_room", bestRoom);
+        }
+        if (Kills > bestKills)
+        {
+            bestKills = Kills;
+            PlayerPrefs.SetInt("best_kills", bestKills);
+        }
+        PlayerPrefs.Save();
+    }
+
+    public int BestRoom => PlayerPrefs.GetInt("best_room", 0);
+    public int BestKills => PlayerPrefs.GetInt("best_kills", 0);
+}
