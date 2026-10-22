@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)][string]$GameDir,
     [Parameter(Mandatory = $true)][string]$ShortcutName,
     [string]$ExeName = 'CardboardDungeon.exe',
+    [string]$IconPath = '',
     [string]$Description = 'Cardboard Dungeon'
 )
 
@@ -53,7 +54,9 @@ public static class PortableLink {
         link.SetPath(target);
         link.SetWorkingDirectory(workingDir);
         link.SetDescription(description);
-        link.SetIconLocation(iconPath, 0);
+        if (!string.IsNullOrEmpty(iconPath)) {
+            link.SetIconLocation(iconPath, 0);
+        }
         link.SetRelativePath(relativeTarget, 0);
         ((IPersistFile)link).Save(lnkPath, true);
     }
@@ -69,7 +72,7 @@ if (Test-Path -LiteralPath $lnkPath) {
     Remove-Item -LiteralPath $lnkPath -Force
 }
 
-[PortableLink]::Create($lnkPath, $exePath, $gameDir, $ExeName, $Description, $exePath)
+[PortableLink]::Create($lnkPath, $exePath, $gameDir, $ExeName, $Description, $IconPath)
 
 if (-not (Test-Path -LiteralPath $lnkPath)) {
     throw "Failed to create shortcut: $lnkPath"
