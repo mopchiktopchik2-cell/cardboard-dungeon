@@ -32,8 +32,14 @@ public class SkillSystem : MonoBehaviour
             Slots[i].Cd = 0f;
             Slots[i].MaxCd = 0f;
         }
-        Slots[0].Def = Data.Skill("fireball");
-        Slots[1].Def = Data.Skill("shield");
+        var starter = Data.StarterSkills(MetaProgress.SelectedClass);
+        for (int i = 0; i < starter.Length && i < MaxSlots; i++)
+        {
+            Slots[i].Def = Data.Skill(starter[i]);
+        }
+        // Любой класс должен остаться с рабочим набором, даже если контент поменяется.
+        if (Slots[0].Def == null) Slots[0].Def = Data.Skill("fireball");
+        if (Slots[1].Def == null) Slots[1].Def = Data.Skill("heal");
     }
 
     public void ResetCooldowns()
@@ -50,6 +56,7 @@ public class SkillSystem : MonoBehaviour
     {
         var def = Data.Skill(id);
         if (def == null) return false;
+        if (!Data.SkillAllowedForClass(id, MetaProgress.SelectedClass)) return false;
         foreach (var s in Slots)
         {
             if (s.Def != null && s.Def.Id == id) return false;
@@ -95,8 +102,10 @@ public class SkillSystem : MonoBehaviour
         var slot = Slots[index];
         if (slot.Def == null || slot.Cd > 0f) return;
         if (index >= MaxSlots) return;
+        if (Player.StunTimer > 0f) return;
         if (!Cast(slot.Def)) return;
-        float cd = slot.Def.Cooldown * (1f - Mathf.Clamp(Player.Stats.cdr, 0f, 0.55f));
+        float cd = Data.EffectiveCooldown(slot.Def, MetaProgress.SelectedClass) *
+                   (1f - Mathf.Clamp(Player.Stats.cdr, 0f, 0.55f));
         slot.Cd = cd;
         slot.MaxCd = cd;
         Game.I.Audio.Play("sfx_cast", 0.55f, 1f, 0.08f);
@@ -122,9 +131,61 @@ public class SkillSystem : MonoBehaviour
                 Game.I.Fx.Sprite("fx_flame", origin, 0.6f, 0.25f, new Color(1f, 0.7f, 0.3f), 1550);
                 return true;
             }
-            case "shield":
-                player.AddShield(35f, 8f);
+            case "frost":
+            {
+                const float radius = 4.1f;
+                var frozen = rooms.EnemiesInRadius(pos, radius);
+                Game.I.Fx.Ring(pos, new Color(0.55f, 0.9f, 1f), radius, 0.55f);
+                Game.I.Fx.Burst("fx_flame", pos, 16, 4.2f, 0.55f, 0.55f,
+                    new Color(0.7f, 0.95f, 1f), 1610);
+                foreach (var e in frozen)
+                {
+                    if (e != null && !e.Dead) e.Freeze(Data.FrostDuration, Data.FrostDamagePercent);
+                }
+                Game.I.Audio.Play("sfx_ice", 0.9f);
+                Game.I.Shake(0.14f, 0.32f);
                 return true;
+            }
+            case "volley":
+            {
+                var targets = rooms.NearestEnemies(pos, 14f, 7);
+                if (targets.Count == 0) return false;
+                Vector2 baseDir = ((Vector2)targets[0].transform.position + Vector2.up * 0.5f - origin).normalized;
+                for (int i = 0; i < 7; i++)
+                {
+                    Vector2 aim = baseDir;
+                    if (targets.Count > 0)
+                    {
+                        var t = targets[i % targets.Count];
+                        if (t != null)
+                        {
+                            aim = ((Vector2)t.transform.position + Vector2.up * 0.5f - origin).normalized;
+                        }
+                    }
+                    aim = Rotate(aim, (i - 3) * 5f);
+                    Projectile.Player(origin, aim, player.DamageOut(10f), 17.5f, "proj_arrow",
+                        new Color(0.72f, 1f, 0.62f), 1.15f, 1, 0f, false, false, false, true, 3.4f);
+                }
+                Game.I.Fx.Sprite("fx_glow", origin, 0.8f, 0.18f,
+                    new Color(0.65f, 1f, 0.5f, 0.65f), 1660);
+                Game.I.Audio.Play("sfx_shoot", 0.75f, 1.05f);
+                return true;
+            }
+            case "shadowrun":
+            {
+                player.StartShadowRun(Data.ShadowRunDuration);
+                return true;
+            }
+            case "cleave":
+            {
+                StartCoroutine(CleaveRoutine(player));
+                return true;
+            }
+            case "shield":
+            {
+                player.AddShield(player.Stats.maxHp * Data.KnightShieldPercent, Data.ShieldDuration);
+                return true;
+            }
             case "nova":
             {
                 Game.I.Fx.Ring(pos, new Color(0.55f, 0.9f, 1f), 3.6f, 0.5f);
@@ -228,6 +289,42 @@ public class SkillSystem : MonoBehaviour
             }
         }
         return false;
+    }
+
+    private IEnumerator CleaveRoutine(Player player)
+    {
+        player.CastLock = Mathf.Max(player.CastLock, 0.56f);
+        player.Visual.Windup(0.3f);
+        player.Visual.Flash(new Color(1f, 0.86f, 0.55f), 0.16f);
+        Game.I.Audio.Play("sfx_cast", 0.45f, 0.7f);
+        yield return new WaitForSeconds(0.22f);
+        if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead) yield break;
+
+        Vector2 center = player.transform.position;
+        const float radius = 2.7f;
+        Game.I.Fx.Ring(center + Vector2.up * 0.5f, new Color(1f, 0.82f, 0.45f, 0.8f), radius, 0.4f);
+        Vector2[] dirs =
+        {
+            Vector2.right, Vector2.up, Vector2.left, Vector2.down,
+            new Vector2(1f, 1f).normalized, new Vector2(-1f, 1f).normalized,
+            new Vector2(-1f, -1f).normalized, new Vector2(1f, -1f).normalized
+        };
+        foreach (var d in dirs)
+        {
+            Game.I.Fx.Slash(center + d * 1.15f + Vector2.up * 0.55f, d);
+        }
+        Game.I.Rooms.DamageEnemies(center, radius, player.DamageOut(38f));
+        Game.I.Audio.Play("sfx_hit", 0.9f, 0.65f);
+        Game.I.Shake(0.2f, 0.32f);
+        Game.I.Hitstop(0.045f);
+    }
+
+    private static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
     }
 
     private IEnumerator MeteorRoutine(Vector2 p, float delay)

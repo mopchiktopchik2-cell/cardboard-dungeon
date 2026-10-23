@@ -244,6 +244,35 @@ public static class MetaProgress
         return PlayerPrefs.GetInt("clears_" + dungeonId, 0);
     }
 
+    public static bool IsDungeonUnlocked(int index)
+    {
+        if (index <= 0) return true;
+        if (index >= Data.Dungeons.Count) return false;
+        var dungeon = Data.Dungeons[index];
+        if (Clears(dungeon.Id) > 0) return true;
+        var previous = Data.Dungeons[index - 1];
+        return Clears(previous.Id) > 0;
+    }
+
+    public static bool IsDungeonUnlocked(string dungeonId)
+    {
+        int index = Data.Dungeons.FindIndex(d => d.Id == dungeonId);
+        return index < 0 || IsDungeonUnlocked(index);
+    }
+
+    public static DungeonDef NextDungeon(DungeonDef current)
+    {
+        if (current == null) return null;
+        int index = Data.Dungeons.FindIndex(d => d.Id == current.Id);
+        if (index < 0 || index + 1 >= Data.Dungeons.Count) return null;
+        return Data.Dungeons[index + 1];
+    }
+
+    public static bool HasNextDungeon(DungeonDef current)
+    {
+        return NextDungeon(current) != null;
+    }
+
     public static void RecordRun(string dungeonId, int reached, int kills, bool victory)
     {
         if (string.IsNullOrEmpty(dungeonId)) return;

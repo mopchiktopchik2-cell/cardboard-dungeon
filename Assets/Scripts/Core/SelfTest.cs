@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Быстрые проверки контента v1.2. Запускаются из редактора (Cardboard/Run Self Tests)
+/// Быстрые проверки контента v1.3. Запускаются из редактора (Cardboard/Run Self Tests)
 /// и не зависят от сцены или запущенной игры.
 /// </summary>
 public static class SelfTest
@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.2");
+        Debug.Log("[SelfTest] begin v1.3");
 
         CheckSkills();
         CheckPerks();
@@ -45,7 +45,7 @@ public static class SelfTest
 
     private static void CheckSkills()
     {
-        Check(Data.Skills.Count == 12, "skills count = 12, got " + Data.Skills.Count);
+        Check(Data.Skills.Count == 16, "skills count = 16, got " + Data.Skills.Count);
         Check(Data.MaxSkillSlots == 5, "max skill slots = 5");
         var ids = new HashSet<string>();
         foreach (var s in Data.Skills)
@@ -63,7 +63,29 @@ public static class SelfTest
         Check(Data.Skill("fireball") != null, "fireball exists");
         Check(Data.Skill("shield") != null, "shield exists");
         Check(Data.Skill("heal") != null, "heal exists");
+        Check(Data.Skill("frost") != null, "frost exists");
+        Check(Data.Skill("volley") != null, "volley exists");
+        Check(Data.Skill("shadowrun") != null, "shadowrun exists");
+        Check(Data.Skill("cleave") != null, "cleave exists");
         Check(Data.Skill("nope") == null, "unknown skill returns null");
+
+        Check(Mathf.Approximately(Data.Skill("frost").Cooldown, 15f), "frost cooldown is 15");
+        Check(Mathf.Approximately(Data.Skill("volley").Cooldown, Data.VolleyCooldown), "volley cooldown is 8");
+        Check(Mathf.Approximately(Data.Skill("shadowrun").Cooldown, Data.ShadowRunCooldown),
+            "shadowrun cooldown is 9");
+        Check(Mathf.Approximately(Data.Skill("cleave").Cooldown, Data.CleaveCooldown), "cleave cooldown is 8");
+        Check(Mathf.Approximately(Data.EffectiveCooldown(Data.Skill("shield"), HeroClass.Swordsman),
+            Data.KnightShieldCooldown), "knight shield cooldown is 10");
+        Check(Data.SkillAllowedForClass("shield", HeroClass.Swordsman), "shield is available to knight");
+        Check(!Data.SkillAllowedForClass("shield", HeroClass.Mage), "mage cannot learn shield");
+        Check(!Data.SkillAllowedForClass("shield", HeroClass.Ranger), "ranger cannot learn shield");
+        Check(Data.SkillAllowedForClass("frost", HeroClass.Ranger), "other skills stay available across classes");
+        Check(Data.PerkAllowedForClass("shieldstart", HeroClass.Swordsman),
+            "barrier perk is available to knight");
+        Check(!Data.PerkAllowedForClass("shieldstart", HeroClass.Mage),
+            "mage cannot take the shield barrier");
+        Check(!Data.PerkAllowedForClass("shieldstart", HeroClass.Ranger),
+            "ranger cannot take the shield barrier");
     }
 
     private static void CheckPerks()
@@ -84,10 +106,11 @@ public static class SelfTest
             if (p.Unique) unique++;
         }
 
-        Check(unique >= 2, "at least two unique perks");
+        Check(unique >= 1, "at least one unique perk");
         Check(Data.Perk("damage") != null, "damage perk exists");
-        Check(Data.Perk("slot") != null && Data.Perk("slot").Unique, "slot perk is unique");
+        Check(Data.Perk("slot") != null && !Data.Perk("slot").Unique, "slot perk is repeatable");
         Check(Data.Perk("secondwind") != null && Data.Perk("secondwind").Unique, "secondwind is unique");
+        Check(Data.Perk("lifesteal") != null && !Data.Perk("lifesteal").Unique, "lifesteal is repeatable");
         Check(Data.Perk("nope") == null, "unknown perk returns null");
     }
 
@@ -117,6 +140,21 @@ public static class SelfTest
         Check(Data.Hero(HeroClass.Swordsman).Hp > Data.Hero(HeroClass.Mage).Hp, "swordsman is tougher than mage");
         Check(Data.Hero(HeroClass.Ranger).AttackInterval < Data.Hero(HeroClass.Swordsman).AttackInterval,
             "ranger attacks faster than swordsman");
+
+        CheckStarter(HeroClass.Mage, "fireball", "frost");
+        CheckStarter(HeroClass.Swordsman, "shield", "cleave");
+        CheckStarter(HeroClass.Ranger, "volley", "shadowrun");
+    }
+
+    private static void CheckStarter(HeroClass hero, string first, string second)
+    {
+        var starter = Data.StarterSkills(hero);
+        Check(starter != null && starter.Length == 2, "starter set must have two skills: " + hero);
+        if (starter == null || starter.Length != 2) return;
+        Check(starter[0] == first && starter[1] == second,
+            "wrong starter skills for " + hero + ": " + starter[0] + ", " + starter[1]);
+        Check(Data.Skill(starter[0]) != null && Data.Skill(starter[1]) != null,
+            "starter skill is missing for " + hero);
     }
 
     private static void CheckDungeons()
@@ -176,6 +214,7 @@ public static class SelfTest
     {
         Check(Data.Enemies.Count == 14, "enemy count = 14, got " + Data.Enemies.Count);
         var sprites = new HashSet<string>();
+        var specials = new HashSet<string>();
         var bossKinds = new HashSet<EnemyKind>
         {
             EnemyKind.BoneKing, EnemyKind.SpiderQueen, EnemyKind.Lich
@@ -196,6 +235,8 @@ public static class SelfTest
             Check(e.Scale > 0.4f && e.Scale < 2.5f, "enemy scale out of range: " + kind);
             Check(ArtExists(e.Sprite), "enemy sprite missing: " + e.Sprite);
             Check(sprites.Add(e.Sprite), "enemy sprite reused: " + e.Sprite);
+            Check(!string.IsNullOrEmpty(e.Special), "enemy special missing: " + kind);
+            Check(specials.Add(e.Special), "enemy special reused: " + e.Special);
             Check(e.Boss == bossKinds.Contains(kind), "enemy boss flag mismatch: " + kind);
             if (e.Boss)
             {
@@ -222,6 +263,10 @@ public static class SelfTest
             "spider queen is harder than bone king");
         Check(Data.Enemy(EnemyKind.Executioner).Hp > Data.Enemy(EnemyKind.Guard).Hp,
             "executioner is tougher than guard");
+        Check(Data.Enemy(EnemyKind.Guard).Special == "shield_charge", "guard has a dodgeable charge");
+        Check(Data.Enemy(EnemyKind.Spider).Special == "web_spit", "spider has a web ability");
+        Check(Data.Enemy(EnemyKind.PlagueDoctor).Special == "plague_pool", "plague doctor leaves a pool");
+        Check(Data.Enemy(EnemyKind.Hound).Special == "pounce", "hound has a pounce");
     }
 
     private static void CheckRooms()
@@ -357,7 +402,7 @@ public static class SelfTest
             "floor_crypt_a", "floor_crypt_b", "floor_web_a", "floor_web_b",
             "floor_throne_a", "floor_throne_b", "wall_crypt", "wall_web", "wall_throne",
             "proj_soul", "proj_bone", "proj_skull", "proj_poison", "proj_arrow",
-            "fx_soul", "fx_slash", "fx_glow", "fx_ember", "fx_mote",
+            "fx_soul", "fx_shadow", "fx_slash", "fx_glow", "fx_ember", "fx_mote",
             "ui_menu_bg", "ui_menu_frame", "ui_rune", "ui_divider", "ui_logo",
             "ui_card_dark", "ui_panel_dark", "ui_panel",
             "ui_dungeon_crypt", "ui_dungeon_web", "ui_dungeon_throne",
@@ -395,6 +440,14 @@ public static class SelfTest
         Check(Data.Perks.Count >= 15, "enough perk variety");
         Check(Data.RoomCount > 8, "long enough run");
         Check(Data.Dungeons.Count == 3, "three difficulty tiers");
+        Check(Mathf.Approximately(Data.LifestealPerPerk, 0.03f), "lifesteal per perk is 3%");
+        Check(Mathf.Approximately(Data.LifestealCap, 0.12f), "lifesteal cap is 12%");
+        Check(Mathf.Approximately(Data.KnightShieldPercent, 0.30f), "knight shield is 30% hp");
+        Check(Mathf.Approximately(Data.ShieldDuration, 5f), "shield lasts 5 seconds");
+        Check(Mathf.Approximately(Data.FrostDuration, 2f), "frost lasts 2 seconds");
+        Check(Mathf.Approximately(Data.FrostDamagePercent, 0.20f), "frost deals 20% max hp");
+        Check(Mathf.Approximately(Data.ShadowRunDuration, 3f), "shadow run lasts 3 seconds");
+        Check(Data.LifestealPerPerk * 4f >= Data.LifestealCap - 0.001f, "four lifesteal perks reach the cap");
 
         var mage = Data.Hero(HeroClass.Mage);
         var swordsman = Data.Hero(HeroClass.Swordsman);

@@ -185,15 +185,15 @@ public static partial class Data
         return new List<HeroClassDef>
         {
             new HeroClassDef(HeroClass.Mage, "МАГ", "ПЕПЕЛЬНЫЙ УЧЕНИК",
-                "Дальний бой. Хрупкий, но наносит высокий урон и лучше владеет навыками.",
+                "Дальний бой. Огненный шар и ледяная тюрьма. Атакует только стоя.",
                 "wizard", Pal.Teal, HeroAttackStyle.Bolt,
                 100f, 4.9f, 9f, 0.75f, 6.9f, 0.04f, 0f, 1.15f),
             new HeroClassDef(HeroClass.Swordsman, "МЕЧНИК", "ПОСЛЕДНИЙ СТРАЖ",
-                "Ближний бой. Широкий размах меча задевает сразу нескольких врагов.",
+                "Ближний бой. Щит и круговой удар. Рубит на ходу и держит удар.",
                 "swordsman", Pal.Gold, HeroAttackStyle.Slash,
                 155f, 5.15f, 16f, 0.62f, 2.45f, 0.05f, 0.08f, 0.92f),
             new HeroClassDef(HeroClass.Ranger, "РЕЙНДЖЕР", "СЛЕПОЙ ОХОТНИК",
-                "Быстрые стрелы, большая дальность и высокий шанс критического удара.",
+                "Дальний бой. Залп самонаводящихся стрел и неуязвимый теневой бег.",
                 "ranger", Pal.Green, HeroAttackStyle.Arrow,
                 112f, 5.45f, 7.4f, 0.46f, 8.6f, 0.10f, 0f, 1f)
         };

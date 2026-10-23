@@ -45,7 +45,14 @@ public class Player : MonoBehaviour
     public float PoisonTimer;
     public float PoisonDps;
     public float RageTimer;
+    public float StunTimer;
+    public float CastLock;
+    public float SlowTimer;
+    public float SlowFactor = 1f;
+    public float ShadowRunTimer;
 
+    private float shadowTrailTimer;
+    private bool dashing;
     private Vector2 moveInput;
     private Vector2 facing = Vector2.right;
     private float autoTimer;
@@ -99,6 +106,12 @@ public class Player : MonoBehaviour
         Control = true;
         PoisonTimer = 0f;
         RageTimer = 0f;
+        StunTimer = 0f;
+        CastLock = 0f;
+        SlowTimer = 0f;
+        SlowFactor = 1f;
+        ShadowRunTimer = 0f;
+        shadowTrailTimer = 0f;
         autoTimer = 0f;
         currentTarget = null;
         transform.rotation = Quaternion.identity;
@@ -165,6 +178,12 @@ public class Player : MonoBehaviour
         }
         PoisonTimer = 0f;
         RageTimer = 0f;
+        StunTimer = 0f;
+        CastLock = 0f;
+        SlowTimer = 0f;
+        SlowFactor = 1f;
+        ShadowRunTimer = 0f;
+        shadowTrailTimer = 0f;
         Invuln = 0.4f;
         if (Skills != null) Skills.ResetCooldowns();
     }
@@ -188,11 +207,34 @@ public class Player : MonoBehaviour
         if (DashCd > 0f) DashCd -= dt;
         if (autoTimer > 0f) autoTimer -= dt;
         if (RageTimer > 0f) RageTimer -= dt;
+        if (StunTimer > 0f) StunTimer -= dt;
+        if (CastLock > 0f) CastLock -= dt;
+        if (SlowTimer > 0f)
+        {
+            SlowTimer -= dt;
+            if (SlowTimer <= 0f) SlowFactor = 1f;
+        }
+        if (ShadowRunTimer > 0f)
+        {
+            ShadowRunTimer -= dt;
+            shadowTrailTimer -= dt;
+            if (shadowTrailTimer <= 0f)
+            {
+                shadowTrailTimer = 0.09f;
+                Game.I.Fx.Afterimage(Visual.Main);
+            }
+        }
 
         UpdatePoison(dt);
         UpdateTint();
 
         moveInput = Vector2.zero;
+        if (StunTimer > 0f || CastLock > 0f)
+        {
+            Visual.Walking = false;
+            return;
+        }
+
         if (Control)
         {
             if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) moveInput.x -= 1f;
@@ -202,12 +244,13 @@ public class Player : MonoBehaviour
             if (moveInput.sqrMagnitude > 1f) moveInput.Normalize();
         }
 
-        if (moveInput.sqrMagnitude > 0.01f)
+        bool moving = moveInput.sqrMagnitude > 0.01f;
+        if (moving)
         {
             facing = moveInput.normalized;
             Visual.Face(moveInput.x);
             Visual.Walking = true;
-            float speed = Stats.speed;
+            float speed = Stats.speed * SlowFactor;
             transform.position = Game.I.Rooms.Move(transform.position, moveInput * speed * dt, 0.32f);
             stepTimer -= dt;
             if (stepTimer <= 0f)
@@ -221,16 +264,18 @@ public class Player : MonoBehaviour
             Visual.Walking = false;
         }
 
-        if (Control && Input.GetKeyDown(KeyCode.Space) && DashCd <= 0f)
+        if (Control && Input.GetKeyDown(KeyCode.Space) && DashCd <= 0f && !dashing)
         {
-            Vector2 dir = moveInput.sqrMagnitude > 0.01f ? moveInput.normalized : facing;
+            Vector2 dir = moving ? moveInput.normalized : facing;
             dashRoutine = StartCoroutine(Dash(dir));
         }
 
         if (Control)
         {
             currentTarget = Game.I.Rooms.NearestEnemy(transform.position, Stats.range);
-            if (currentTarget != null && autoTimer <= 0f)
+            bool stationaryStyle = Data.Hero(MetaProgress.SelectedClass).Style == HeroAttackStyle.Slash;
+            bool mayAttackWhileMoving = stationaryStyle || ShadowRunTimer > 0f;
+            if (currentTarget != null && autoTimer <= 0f && !dashing && (!moving || mayAttackWhileMoving))
             {
                 FireAt(currentTarget);
                 autoTimer = Stats.attackInterval * (RageTimer > 0f ? 0.72f : 1f);
@@ -255,8 +300,11 @@ public class Player : MonoBehaviour
     private void UpdateTint()
     {
         Color c = Color.white;
-        if (PoisonTimer > 0f && RageTimer > 0f) c = new Color(0.8f, 0.75f, 0.5f);
+        if (StunTimer > 0f) c = new Color(1f, 0.9f, 0.55f);
+        else if (ShadowRunTimer > 0f) c = new Color(0.58f, 0.9f, 1f, 0.82f);
+        else if (PoisonTimer > 0f && RageTimer > 0f) c = new Color(0.8f, 0.75f, 0.5f);
         else if (PoisonTimer > 0f) c = new Color(0.65f, 0.95f, 0.6f);
+        else if (SlowTimer > 0f) c = new Color(0.72f, 0.88f, 1f);
         else if (RageTimer > 0f) c = new Color(1f, 0.72f, 0.65f);
         Visual.SetTint(c);
     }
@@ -350,6 +398,7 @@ public class Player : MonoBehaviour
 
     private IEnumerator Dash(Vector2 dir)
     {
+        dashing = true;
         DashCd = DashCooldown;
         Invuln = Mathf.Max(Invuln, 0.28f);
         Game.I.Audio.Play("sfx_dash", 0.6f);
@@ -364,6 +413,7 @@ public class Player : MonoBehaviour
             yield return null;
         }
         Visual.Walking = false;
+        dashing = false;
     }
 
     public void TakeDamage(float amount, Vector2 source, bool ignoreInvuln = false, bool isDot = false,
@@ -415,9 +465,7 @@ public class Player : MonoBehaviour
             if (Stats.secondWind && !Stats.secondWindUsed)
             {
                 Stats.secondWindUsed = true;
-                Stats.hp = 1f;
-                Shield = 12f;
-                ShieldTimer = 6f;
+                Stats.hp = Mathf.Max(1f, Stats.maxHp * 0.12f);
                 Invuln = 1.4f;
                 Game.I.Fx.Heal(transform.position);
                 Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.7f, "ВТОРОЕ ДЫХАНИЕ",
@@ -442,6 +490,40 @@ public class Player : MonoBehaviour
             Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.3f, "+" + Mathf.RoundToInt(healed),
                 new Color(0.55f, 1f, 0.6f), 0.9f);
         }
+    }
+
+    public void Stun(float duration)
+    {
+        if (Dead || duration <= 0f) return;
+        StunTimer = Mathf.Max(StunTimer, duration);
+        CastLock = 0f;
+        Visual.Walking = false;
+        Visual.Flash(new Color(1f, 0.9f, 0.5f), 0.2f);
+        Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.55f, "ОГЛУШЁН",
+            new Color(1f, 0.85f, 0.4f), 0.8f);
+        Game.I.Audio.Play("sfx_hit", 0.55f, 0.75f);
+    }
+
+    public void Webbed(float duration, float factor = 0.55f)
+    {
+        if (Dead) return;
+        SlowTimer = Mathf.Max(SlowTimer, duration);
+        SlowFactor = Mathf.Min(SlowFactor, factor);
+        Visual.Flash(new Color(0.75f, 0.9f, 1f), 0.18f);
+        Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.4f, "ПАУТИНА",
+            new Color(0.75f, 0.9f, 1f), 0.7f);
+    }
+
+    public void StartShadowRun(float duration)
+    {
+        if (Dead || duration <= 0f) return;
+        ShadowRunTimer = Mathf.Max(ShadowRunTimer, duration);
+        Invuln = Mathf.Max(Invuln, duration + 0.05f);
+        shadowTrailTimer = 0f;
+        Game.I.Fx.Ring(transform.position + Vector3.up * 0.5f, new Color(0.55f, 0.95f, 1f), 1.4f, 0.5f);
+        Game.I.Fx.Burst("fx_shadow", transform.position, 8, 2.2f, 0.45f, 0.45f,
+            new Color(0.45f, 0.85f, 1f, 0.8f), 1600);
+        Game.I.Audio.Play("sfx_dash", 0.7f, 1.15f);
     }
 
     public void AddShield(float amount, float duration = 6f)
@@ -475,8 +557,9 @@ public class Player : MonoBehaviour
 
     public void KillHeal(float dealtDamage)
     {
-        if (Stats.lifesteal <= 0f) return;
-        Heal(dealtDamage * Stats.lifesteal);
+        float lifesteal = Mathf.Min(Stats.lifesteal, Data.LifestealCap);
+        if (lifesteal <= 0f || dealtDamage <= 0f) return;
+        Heal(dealtDamage * lifesteal);
     }
 
     public IEnumerator WalkTo(Vector2 target, float duration)

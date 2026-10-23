@@ -96,8 +96,10 @@ public class RoomManager : MonoBehaviour
         var table = new GameObject("Table");
         table.transform.SetParent(Root, false);
         var tableSr = table.AddComponent<SpriteRenderer>();
+        Color floorTint = VisibleTint(theme.FloorTint, 0.24f);
+        Color wallTint = VisibleTint(theme.WallTint, 0.32f);
         tableSr.sprite = art.World("table_bg");
-        tableSr.color = Color.Lerp(new Color(0.62f, 0.58f, 0.72f, 1f), theme.FloorTint, 0.35f);
+        tableSr.color = Color.Lerp(new Color(0.72f, 0.68f, 0.78f, 1f), floorTint, 0.32f);
         tableSr.sortingOrder = -3000;
         tableSr.drawMode = SpriteDrawMode.Simple;
         float tw = tableSr.sprite.bounds.size.x;
@@ -107,24 +109,23 @@ public class RoomManager : MonoBehaviour
         string floorName = index % 2 == 0 ? dungeon.FloorA : dungeon.FloorB;
         if (theme != null && !string.IsNullOrEmpty(theme.Floor)) floorName = theme.Floor;
         var floorSr = AddTile(floorName, Vector3.zero, new Vector2(17.9f, 9.1f), -2000);
-        floorSr.color = theme.FloorTint;
-        AddQuad(new Vector3(0f, 0f, 0f), new Vector2(17.9f, 9.1f), A(theme.FogA, 0.12f), -1995, 0f);
-        AddQuad(new Vector3(0f, 2.9f, 0f), new Vector2(17.9f, 3.4f), A(theme.Torch, 0.035f), -1994, 0f);
+        floorSr.color = floorTint;
+        AddQuad(new Vector3(0f, 0f, 0f), new Vector2(17.9f, 9.1f), A(theme.FogA, 0.065f), -1995, 0f);
+        AddQuad(new Vector3(0f, 2.9f, 0f), new Vector2(17.9f, 3.4f), A(theme.Torch, 0.022f), -1994, 0f);
 
-        // Cold gloom pooling at the edges of the arena.
-        AddQuad(new Vector3(0f, 3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.34f), -1988, 0f);
-        AddQuad(new Vector3(0f, -3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.31f), -1988, 0f);
+        // Мягкая тень по краям арены, но без полного затемнения текстур.
+        AddQuad(new Vector3(0f, 3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.18f), -1988, 0f);
+        AddQuad(new Vector3(0f, -3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.16f), -1988, 0f);
 
         // тёмная кромка листа картона
-        AddQuad(new Vector3(0f, -4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.6f), -1990, 0f);
-        AddQuad(new Vector3(0f, 4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.5f), -1990, 0f);
+        AddQuad(new Vector3(0f, -4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.34f), -1990, 0f);
+        AddQuad(new Vector3(0f, 4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.28f), -1990, 0f);
 
         string wallName = !string.IsNullOrEmpty(theme.Wall) ? theme.Wall : "wall_h";
         var wallTop = AddTile(wallName, new Vector3(0f, 5.05f, 0f), new Vector2(19.6f, 1.25f), -1500);
         var wallBottom = AddTile(wallName, new Vector3(0f, -5.05f, 0f), new Vector2(19.6f, 1.25f), -1490);
         var wallLeft = AddTile(wallName, new Vector3(-9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1480, 90f);
         var wallRight = AddTile(wallName, new Vector3(9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1470, -90f);
-        Color wallTint = theme.WallTint;
         wallTop.color = wallTint;
         wallBottom.color = wallTint;
         wallLeft.color = wallTint;
@@ -137,14 +138,14 @@ public class RoomManager : MonoBehaviour
             var p = new Vector3((float)rng.NextDouble() * 16f - 8f, (float)rng.NextDouble() * 8f - 4f, 0f);
             if (Mathf.Abs(p.x) < 2f && Mathf.Abs(p.y) < 1.6f) continue;
             var q = AddQuad(p, new Vector2(0.35f + (float)rng.NextDouble() * 0.7f,
-                0.2f + (float)rng.NextDouble() * 0.4f), A(theme.Motes, 0.14f), -1950,
+                0.2f + (float)rng.NextDouble() * 0.4f), A(theme.Motes, 0.11f), -1950,
                 (float)rng.NextDouble() * 180f);
             q.transform.localScale = new Vector3(q.transform.localScale.x, q.transform.localScale.y, 1f);
         }
 
-        AddFog(new Vector3(-3.8f, 1.2f, 0f), 7.5f, A(theme.FogA, 0.08f), 0.17f);
-        AddFog(new Vector3(3.4f, -1.6f, 0f), 6.2f, A(theme.FogB, 0.065f), 0.11f);
-        AddFog(new Vector3(0.4f, 3.2f, 0f), 5.2f, A(theme.FogA, 0.05f), 0.08f);
+        AddFog(new Vector3(-3.8f, 1.2f, 0f), 7.5f, A(theme.FogA, 0.04f), 0.17f);
+        AddFog(new Vector3(3.4f, -1.6f, 0f), 6.2f, A(theme.FogB, 0.03f), 0.11f);
+        AddFog(new Vector3(0.4f, 3.2f, 0f), 5.2f, A(theme.FogA, 0.025f), 0.08f);
         for (int i = 0; i < 26; i++)
         {
             var mote = new GameObject("mote");
@@ -152,7 +153,7 @@ public class RoomManager : MonoBehaviour
             mote.transform.position = new Vector3(Random.Range(-8.2f, 8.2f), Random.Range(-4.2f, 4.2f), 0f);
             var msr = mote.AddComponent<SpriteRenderer>();
             msr.sprite = art.World("fx_mote");
-            msr.color = i % 3 == 0 ? A(theme.Torch, 0.38f) : A(theme.Motes, 0.24f);
+            msr.color = i % 3 == 0 ? A(theme.Torch, 0.34f) : A(theme.Motes, 0.2f);
             msr.sortingOrder = -450;
             float s = Random.Range(0.05f, 0.17f);
             mote.transform.localScale = new Vector3(s, s, 1f);
@@ -164,6 +165,14 @@ public class RoomManager : MonoBehaviour
     private static Color A(Color c, float alpha)
     {
         return new Color(c.r, c.g, c.b, alpha);
+    }
+
+    /// <summary>Поднимает тёмные палитры комнат, чтобы текстуры пола и стен читались.</summary>
+    public static Color VisibleTint(Color c, float lift)
+    {
+        Color lifted = Color.Lerp(c, Color.white, Mathf.Clamp01(lift));
+        return new Color(Mathf.Min(1f, lifted.r * 1.05f), Mathf.Min(1f, lifted.g * 1.05f),
+            Mathf.Min(1f, lifted.b * 1.05f), c.a);
     }
 
     private SpriteRenderer AddTile(string sprite, Vector3 pos, Vector2 size, int order, float rotation = 0f)
@@ -651,21 +660,81 @@ public class RoomManager : MonoBehaviour
 
     public Vector2 Move(Vector2 pos, Vector2 delta, float radius)
     {
-        Vector2 p = pos + delta;
-        p = Clamp(p, radius);
+        Vector2 p = Clamp(pos + delta, radius);
+        // Несколько проходов не дают вытолкнуть персонажа из одного препятствия прямо в другое.
+        for (int pass = 0; pass < 3; pass++)
+        {
+            bool pushed = false;
+            for (int i = 0; i < Obstacles.Count; i++)
+            {
+                var o = Obstacles[i];
+                Vector2 d = p - o.Pos;
+                float min = o.Radius + radius;
+                if (d.sqrMagnitude < min * min)
+                {
+                    float dist = d.magnitude;
+                    if (dist < 0.0001f) d = Vector2.up;
+                    p = o.Pos + d.normalized * min;
+                    pushed = true;
+                }
+            }
+            p = Clamp(p, radius);
+            if (!pushed) break;
+        }
+        return p;
+    }
+
+    /// <summary>
+    /// Локальный обход препятствий: если прямой путь перекрыт, пробуем отвернуть.
+    /// Это не полноценный A*, но мобы перестают бесконечно тереться о декор.
+    /// </summary>
+    public Vector2 Steer(Vector2 pos, Vector2 desired, float radius, float lookAhead = 1.7f, float side = 1f)
+    {
+        if (desired.sqrMagnitude < 0.001f) return desired;
+        Vector2 d = desired.normalized;
+        if (!PathBlocked(pos, d, radius, lookAhead)) return d;
+
+        float[] degrees = { 28f, 52f, 78f, 105f, 132f, 158f };
+        for (int i = 0; i < degrees.Length; i++)
+        {
+            for (int s = 0; s < 2; s++)
+            {
+                float sign = (s == 0 ? 1f : -1f) * (side >= 0f ? 1f : -1f);
+                Vector2 candidate = Rotate(d, degrees[i] * sign);
+                if (!PathBlocked(pos, candidate, radius, lookAhead)) return candidate;
+            }
+        }
+        return d;
+    }
+
+    private bool PathBlocked(Vector2 pos, Vector2 dir, float radius, float lookAhead)
+    {
+        Vector2 end = pos + dir * lookAhead;
+        if (end.x < Arena.xMin + radius + 0.08f || end.x > Arena.xMax - radius - 0.08f ||
+            end.y < Arena.yMin + radius + 0.08f || end.y > Arena.yMax - radius - 0.08f)
+        {
+            return true;
+        }
+
         for (int i = 0; i < Obstacles.Count; i++)
         {
             var o = Obstacles[i];
-            Vector2 d = p - o.Pos;
-            float min = o.Radius + radius;
-            if (d.sqrMagnitude < min * min)
-            {
-                float dist = d.magnitude;
-                if (dist < 0.0001f) d = Vector2.up;
-                p = o.Pos + d.normalized * min;
-            }
+            float forward = Vector2.Dot(o.Pos - pos, dir);
+            if (forward < -radius || forward > lookAhead + o.Radius) continue;
+            float t = Mathf.Clamp(forward, 0f, lookAhead);
+            Vector2 nearest = pos + dir * t;
+            float clearance = o.Radius + radius + 0.12f;
+            if ((nearest - o.Pos).sqrMagnitude < clearance * clearance) return true;
         }
-        return Clamp(p, radius);
+        return false;
+    }
+
+    private static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
     }
 
     public Vector2 Clamp(Vector2 p, float radius)

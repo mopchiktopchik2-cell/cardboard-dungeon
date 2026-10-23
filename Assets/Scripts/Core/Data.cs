@@ -81,6 +81,7 @@ public class EnemyDef
     public float Scale;
     public bool Boss;
     public string Projectile = "proj_skull";
+    public string Special;
 
     public EnemyDef Clone()
     {
@@ -128,11 +129,23 @@ public static partial class Data
     public const int RoomCount = 12;
     public const int MaxSkillSlots = 5;
 
+    public const float LifestealPerPerk = 0.03f;
+    public const float LifestealCap = 0.12f;
+    public const float KnightShieldPercent = 0.30f;
+    public const float ShieldDuration = 5f;
+    public const float KnightShieldCooldown = 10f;
+    public const float FrostDuration = 2f;
+    public const float FrostDamagePercent = 0.20f;
+    public const float VolleyCooldown = 8f;
+    public const float ShadowRunDuration = 3f;
+    public const float ShadowRunCooldown = 9f;
+    public const float CleaveCooldown = 8f;
+
     public static readonly List<SkillDef> Skills = new List<SkillDef>
     {
         new SkillDef("fireball", "ОГНЕННЫЙ ШАР", "Шар летит в ближайшего врага и взрывается по площади.", 4f,
             "icon_fireball", Pal.Red),
-        new SkillDef("shield", "ЩИТ", "Барьер поглощает 35 урона в течение 8 секунд.", 11f,
+        new SkillDef("shield", "ЩИТ РЫЦАРЯ", "Только рыцарь. Барьер на 30% максимального HP, держится 5 секунд.", 10f,
             "icon_shield", Pal.Blue),
         new SkillDef("nova", "ЛЕДЯНАЯ НОВА", "Волна холода вокруг мага: урон и замедление врагов.", 8f,
             "icon_nova", Pal.Teal),
@@ -153,7 +166,15 @@ public static partial class Data
         new SkillDef("golem", "КАРТОННЫЙ ГОЛЕМ", "Голем сражается на вашей стороне 12 секунд.", 20f,
             "icon_golem", Pal.Paper),
         new SkillDef("rage", "БЕРСЕРК", "6 секунд: +50% урона и +39% скорости атаки.", 18f,
-            "icon_rage", Pal.RedDeep)
+            "icon_rage", Pal.RedDeep),
+        new SkillDef("frost", "ЛЕДЯНАЯ ТЮРЬМА", "Заморозка врагов вокруг на 2 секунды. За это время они теряют 20% максимального HP.", 15f,
+            "icon_perk_freeze", Pal.Teal),
+        new SkillDef("volley", "СЕМЬ СТРЕЛ", "Залп из 7 самонаводящихся стрел по ближайшим врагам.", 8f,
+            "icon_missiles", Pal.Green),
+        new SkillDef("shadowrun", "ТЕНЕВОЙ БЕГ", "3 секунды неуязвимости. Можно стрелять на бегу.", 9f,
+            "icon_blink", Pal.Green),
+        new SkillDef("cleave", "КРУГОВОЙ УДАР", "Герой замирает и бьёт всех вокруг с повышенным уроном.", 8f,
+            "icon_perk_damage", Pal.Gold)
     };
 
     public static readonly List<PerkDef> Perks = new List<PerkDef>
@@ -162,19 +183,19 @@ public static partial class Data
         new PerkDef("attackspeed", "БЫСТРЫЕ РУКИ", "+16% скорости автоатаки.", "icon_perk_speed", false, 1.1f),
         new PerkDef("movespeed", "ЛЁГКИЕ НОГИ", "+8% скорости передвижения.", "icon_perk_speed", false, 1.0f),
         new PerkDef("hp", "ПЛОТНАЯ БУМАГА", "+20 к максимальному здоровью и лечение на 20.", "icon_perk_hp", false, 1.1f),
-        new PerkDef("lifesteal", "ВАМПИРИЗМ", "5% нанесённого урона возвращается здоровьем.", "icon_perk_lifesteal", false, 0.9f),
+        new PerkDef("lifesteal", "ВАМПИРИЗМ", "3% нанесённого урона возвращается здоровьем (максимум 12%).", "icon_perk_lifesteal", false, 0.9f),
         new PerkDef("crit", "МЕТКА РОКА", "+10% шанс крита. Крит наносит 180% урона.", "icon_perk_crit", false, 1.0f),
         new PerkDef("pierce", "ПРОБОЙ", "Снаряды автоатаки пробивают +1 врага.", "icon_perk_pierce", false, 0.9f),
         new PerkDef("multi", "ВЕЕР", "+1 снаряд в автоатаке.", "icon_perk_multi", false, 0.8f),
         new PerkDef("bomb", "ВЗРЫВНАЯ КОНЧИНА", "Побеждённые враги взрываются и бьют соседей.", "icon_perk_bomb", false, 0.7f),
-        new PerkDef("shieldstart", "БУМАЖНЫЙ БАРЬЕР", "В начале каждой комнаты даётся щит на 10.", "icon_perk_shield", false, 0.9f),
+        new PerkDef("shieldstart", "БУМАЖНЫЙ БАРЬЕР", "Только рыцарь. В начале каждой комнаты даётся щит на 10.", "icon_perk_shield", false, 0.9f),
         new PerkDef("cdr", "УСКОРЕНИЕ КАСТА", "-15% перезарядки навыков.", "icon_perk_cd", false, 1.0f),
-        new PerkDef("slot", "НОВЫЙ СЛОТ", "+1 слот навыка и выбор нового навыка.", "icon_perk_slot", true, 0.55f),
+        new PerkDef("slot", "НОВЫЙ СЛОТ", "+1 слот навыка и выбор нового навыка.", "icon_perk_slot", false, 0.8f),
         new PerkDef("freeze", "ИНЕЙ НА КОНЧИКЕ", "Автоатака замедляет врагов на 1 секунду.", "icon_perk_freeze", false, 0.8f),
         new PerkDef("poison", "ТОКСИЧНАЯ КРАСКА", "Автоатака отравляет врагов на 3 секунды.", "icon_perk_poison", false, 0.8f),
         new PerkDef("thorns", "ШИПЫ", "Атакующий получает 8 урона.", "icon_perk_thorns", false, 0.8f),
         new PerkDef("healroom", "ПЕРЕДЫШКА", "После каждой комнаты восстанавливается 12% здоровья.", "icon_perk_heal", false, 0.7f),
-        new PerkDef("secondwind", "ВТОРОЕ ДЫХАНИЕ", "Один раз за забег смертельный удар оставляет 1 HP и щит.", "icon_perk_phoenix", true, 0.45f),
+        new PerkDef("secondwind", "ВТОРОЕ ДЫХАНИЕ", "Один раз за забег смертельный удар оставляет 12% HP и краткую неуязвимость.", "icon_perk_phoenix", true, 0.45f),
         new PerkDef("skillpower", "СИЛЬНАЯ МАГИЯ", "+25% урона навыков.", "icon_perk_armor", false, 0.9f),
         new PerkDef("armor", "ПЛОТНЫЙ КАРТОН", "-8% получаемого урона.", "icon_perk_armor", false, 0.85f)
     };
@@ -184,78 +205,86 @@ public static partial class Data
         [EnemyKind.Imp] = new EnemyDef
         {
             Kind = EnemyKind.Imp, Name = "БУМАЖНЫЙ БЕС", Sprite = "imp",
-            Hp = 24, Speed = 3.45f, Damage = 11, Range = 0.95f, Cooldown = 1.05f, Scale = 1.0f
+            Hp = 24, Speed = 3.45f, Damage = 11, Range = 0.95f, Cooldown = 1.05f, Scale = 1.0f,
+            Special = "fire_spit"
         },
         [EnemyKind.Skeleton] = new EnemyDef
         {
             Kind = EnemyKind.Skeleton, Name = "СКЕЛЕТ-ЛУЧНИК", Sprite = "skeleton",
             Hp = 34, Speed = 2.45f, Damage = 10, Range = 5.2f, Cooldown = 1.85f, Scale = 1.0f,
-            Projectile = "proj_arrow"
+            Projectile = "proj_arrow", Special = "triple_shot"
         },
         [EnemyKind.Boar] = new EnemyDef
         {
             Kind = EnemyKind.Boar, Name = "КАРТОННЫЙ КАБАН", Sprite = "boar",
-            Hp = 62, Speed = 2.85f, Damage = 19, Range = 5.0f, Cooldown = 2.9f, Scale = 1.05f
+            Hp = 62, Speed = 2.85f, Damage = 19, Range = 5.0f, Cooldown = 2.9f, Scale = 1.05f,
+            Special = "boar_charge"
         },
         [EnemyKind.Bomber] = new EnemyDef
         {
             Kind = EnemyKind.Bomber, Name = "БОМБЕР", Sprite = "bomber",
-            Hp = 28, Speed = 3.0f, Damage = 40, Range = 1.8f, Cooldown = 1.5f, Scale = 1.0f
+            Hp = 28, Speed = 3.0f, Damage = 40, Range = 1.8f, Cooldown = 1.5f, Scale = 1.0f,
+            Special = "self_destruct"
         },
         [EnemyKind.Guard] = new EnemyDef
         {
             Kind = EnemyKind.Guard, Name = "СТРАЖ-ЩИТОНОСЕЦ", Sprite = "guard",
-            Hp = 105, Speed = 1.7f, Damage = 18, Range = 1.2f, Cooldown = 1.55f, Scale = 1.08f
+            Hp = 105, Speed = 1.7f, Damage = 18, Range = 1.2f, Cooldown = 1.55f, Scale = 1.08f,
+            Special = "shield_charge"
         },
         [EnemyKind.Shaman] = new EnemyDef
         {
             Kind = EnemyKind.Shaman, Name = "ШАМАН", Sprite = "shaman",
-            Hp = 44, Speed = 2.15f, Damage = 9, Range = 6.5f, Cooldown = 2.45f, Scale = 1.0f
+            Hp = 44, Speed = 2.15f, Damage = 9, Range = 6.5f, Cooldown = 2.45f, Scale = 1.0f,
+            Special = "healing_ritual"
         },
         [EnemyKind.Spider] = new EnemyDef
         {
             Kind = EnemyKind.Spider, Name = "ПАУК", Sprite = "spider",
-            Hp = 19, Speed = 4.05f, Damage = 8, Range = 0.95f, Cooldown = 0.78f, Scale = 0.92f
+            Hp = 19, Speed = 4.05f, Damage = 8, Range = 0.95f, Cooldown = 0.78f, Scale = 0.92f,
+            Special = "web_spit"
         },
         [EnemyKind.Lich] = new EnemyDef
         {
             Kind = EnemyKind.Lich, Name = "ЛИЧ-ПЕРЕПЛЁТ", Sprite = "lich_abyss",
             Hp = 1680, Speed = 1.5f, Damage = 27, Range = 8f, Cooldown = 2.1f, Scale = 1.5f,
-            Boss = true, Projectile = "proj_skull"
+            Boss = true, Projectile = "proj_skull", Special = "soul_storm"
         },
         [EnemyKind.Wraith] = new EnemyDef
         {
             Kind = EnemyKind.Wraith, Name = "ПРИЗРАК-ЛУЧНИК", Sprite = "wraith",
             Hp = 58, Speed = 2.35f, Damage = 13, Range = 6.4f, Cooldown = 2.15f, Scale = 1.05f,
-            Projectile = "proj_soul"
+            Projectile = "proj_soul", Special = "blink_volley"
         },
         [EnemyKind.Executioner] = new EnemyDef
         {
             Kind = EnemyKind.Executioner, Name = "ПАЛАЧ", Sprite = "executioner",
-            Hp = 168, Speed = 1.55f, Damage = 29, Range = 1.35f, Cooldown = 2.15f, Scale = 1.18f
+            Hp = 168, Speed = 1.55f, Damage = 29, Range = 1.35f, Cooldown = 2.15f, Scale = 1.18f,
+            Special = "execution_slam"
         },
         [EnemyKind.PlagueDoctor] = new EnemyDef
         {
             Kind = EnemyKind.PlagueDoctor, Name = "ЧУМНОЙ ДОКТОР", Sprite = "plague_doctor",
             Hp = 76, Speed = 2.0f, Damage = 11, Range = 6.2f, Cooldown = 2.7f, Scale = 1.02f,
-            Projectile = "proj_poison"
+            Projectile = "proj_poison", Special = "plague_pool"
         },
         [EnemyKind.Hound] = new EnemyDef
         {
             Kind = EnemyKind.Hound, Name = "ГОЛОДНЫЙ ГОНЧИЙ", Sprite = "hound",
-            Hp = 46, Speed = 4.25f, Damage = 14, Range = 5.2f, Cooldown = 2.45f, Scale = 0.98f
+            Hp = 46, Speed = 4.25f, Damage = 14, Range = 5.2f, Cooldown = 2.45f, Scale = 0.98f,
+            Special = "pounce"
         },
         [EnemyKind.BoneKing] = new EnemyDef
         {
             Kind = EnemyKind.BoneKing, Name = "КОСТЯНОЙ КОРОЛЬ", Sprite = "bone_king",
             Hp = 980, Speed = 1.4f, Damage = 20, Range = 7.4f, Cooldown = 2.2f, Scale = 1.45f,
-            Boss = true, Projectile = "proj_bone"
+            Boss = true, Projectile = "proj_bone", Special = "bone_storm"
         },
         [EnemyKind.SpiderQueen] = new EnemyDef
         {
             Kind = EnemyKind.SpiderQueen, Name = "МАТКА ПАУКОВ", Sprite = "spider_queen",
             Hp = 1260, Speed = 1.65f, Damage = 23, Range = 7.2f, Cooldown = 2.0f, Scale = 1.5f,
-            Boss = true, Projectile = "proj_poison"
+            Boss = true, Projectile = "proj_poison", Special = "brood_call"
         }
     };
 
@@ -264,6 +293,38 @@ public static partial class Data
     public static SkillDef Skill(string id)
     {
         return Skills.Find(s => s.Id == id);
+    }
+
+    public static string[] StarterSkills(HeroClass hero)
+    {
+        switch (hero)
+        {
+            case HeroClass.Swordsman: return new[] { "shield", "cleave" };
+            case HeroClass.Ranger: return new[] { "volley", "shadowrun" };
+            default: return new[] { "fireball", "frost" };
+        }
+    }
+
+    public static float EffectiveCooldown(SkillDef skill, HeroClass hero)
+    {
+        if (skill == null) return 0f;
+        if (skill.Id == "shield" && hero == HeroClass.Swordsman)
+        {
+            return KnightShieldCooldown;
+        }
+        return skill.Cooldown;
+    }
+
+    public static bool SkillAllowedForClass(string skillId, HeroClass hero)
+    {
+        // Щит — классовая способность рыцаря; другим классам он не выпадает.
+        return skillId != "shield" || hero == HeroClass.Swordsman;
+    }
+
+    public static bool PerkAllowedForClass(string perkId, HeroClass hero)
+    {
+        // Барьер тоже относится к рыцарскому щиту.
+        return perkId != "shieldstart" || hero == HeroClass.Swordsman;
     }
 
     public static PerkDef Perk(string id)

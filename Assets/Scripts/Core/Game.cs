@@ -146,6 +146,10 @@ public class Game : MonoBehaviour
             float shotDelay = room.Type == RoomType.Boss ? 3.2f : 1.2f;
             yield return new WaitForSecondsRealtime(shotDelay);
             Player.Heal(9999f);
+            if (State == GameState.Combat)
+            {
+                yield return QaCastStarters();
+            }
             yield return QaShot(shotsDir, "room_" + (i + 1).ToString("00") + "_" + room.Theme);
             if (State == GameState.Dead)
             {
@@ -194,8 +198,34 @@ public class Game : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(3.0f);
         yield return QaShot(shotsDir, "victory_" + dungeonId);
+        if (HasArg("-qaNext") && State == GameState.Victory && MetaProgress.HasNextDungeon(Run.Dungeon))
+        {
+            StartNextDungeon();
+            yield return WaitReal(3.0f);
+            yield return QaShot(shotsDir, "next_" + Run.Dungeon.Id);
+        }
         yield return new WaitForSecondsRealtime(0.5f);
         Application.Quit();
+    }
+
+    private IEnumerator QaCastStarters()
+    {
+        if (Skills == null) yield break;
+        for (int slot = 0; slot < 2; slot++)
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                var castSlot = Skills.Slots[slot];
+                if (castSlot.Def != null && castSlot.Cd <= 0f && Player.StunTimer <= 0f && !Player.Dead)
+                {
+                    Skills.TryCast(slot);
+                    break;
+                }
+                yield return WaitReal(0.2f);
+            }
+            yield return WaitReal(0.22f);
+        }
+        yield return WaitReal(0.2f);
     }
 
     private void AdvanceQaChoice()
@@ -211,7 +241,11 @@ public class Game : MonoBehaviour
             ChooseSkill(UI.CurrentSkills[0].Id);
             return;
         }
-        if (UI.CurrentPerks.Count > 0) ChoosePerk(0);
+        if (UI.CurrentPerks.Count > 0)
+        {
+            int slotChoice = UI.CurrentPerks.FindIndex(p => p != null && p.Id == "slot");
+            ChoosePerk(slotChoice >= 0 ? slotChoice : 0);
+        }
     }
 
     private IEnumerator QaShot(string dir, string name)
@@ -259,6 +293,11 @@ public class Game : MonoBehaviour
         if ((State == GameState.Dead || State == GameState.Victory) && Input.GetKeyDown(KeyCode.R))
         {
             RestartRun();
+        }
+
+        if (State == GameState.Victory && Input.GetKeyDown(KeyCode.N))
+        {
+            StartNextDungeon();
         }
 
         if (QA)
@@ -309,6 +348,10 @@ public class Game : MonoBehaviour
         Time.timeScale = 1f;
         State = GameState.Menu;
         Transitioning = false;
+        if (!QA && !MetaProgress.IsDungeonUnlocked(MetaProgress.SelectedDungeonId))
+        {
+            MetaProgress.SelectedDungeonId = "crypt";
+        }
         Rooms.BuildMenu();
         Player.ShowInMenu();
         UI.ShowMenu();
@@ -318,6 +361,16 @@ public class Game : MonoBehaviour
 
     public void StartRun()
     {
+        if (!QA && !MetaProgress.IsDungeonUnlocked(MetaProgress.SelectedDungeonId))
+        {
+            string locked = MetaProgress.SelectedDungeon != null
+                ? MetaProgress.SelectedDungeon.Name
+                : "ПОДЗЕМЕЛЬЕ";
+            UI.ShowBanner("ПУТЬ ЗАКРЫТ", locked + " откроется после победы в предыдущем подземелье",
+                1.8f, Pal.Red);
+            Audio.Play("ui_click", 0.5f, 0.75f);
+            return;
+        }
         StopFlow();
         Time.timeScale = 1f;
         UI.HideMenu();
@@ -327,6 +380,22 @@ public class Game : MonoBehaviour
         Run.StartRun();
         Audio.Music("music_dungeon", 0.8f);
         flow = StartCoroutine(BeginRoom(0, true));
+    }
+
+    public void StartNextDungeon()
+    {
+        if (Run == null || Run.Dungeon == null) return;
+        var next = MetaProgress.NextDungeon(Run.Dungeon);
+        if (next == null) return;
+        int index = Data.Dungeons.FindIndex(d => d.Id == next.Id);
+        if (index < 0) return;
+        MetaProgress.SelectedDungeonId = next.Id;
+        Time.timeScale = 1f;
+        UI.HideEnd();
+        UI.HidePause();
+        UI.HidePerks();
+        UI.HideSkills();
+        StartRun();
     }
 
     public void RestartRun()
@@ -414,6 +483,11 @@ public class Game : MonoBehaviour
         State = GameState.Perk;
         Time.timeScale = 0f;
         var perks = Run.RollPerks(3);
+        if (perks.Count == 0)
+        {
+            ContinueAfterChoice();
+            return;
+        }
         UI.ShowPerks(perks, title);
         Audio.Play("sfx_pickup", 0.7f);
     }
@@ -421,18 +495,26 @@ public class Game : MonoBehaviour
     public void ChoosePerk(int index)
     {
         if (State != GameState.Perk) return;
-        var def = UI.CurrentPerks != null && index < UI.CurrentPerks.Count ? UI.CurrentPerks[index] : null;
+        var def = UI.CurrentPerks != null && index >= 0 && index < UI.CurrentPerks.Count
+            ? UI.CurrentPerks[index]
+            : null;
         if (def == null) return;
+        if (!Run.AddPerk(def))
+        {
+            UI.ShowBanner("НЕДОСТУПНО", "Этот перк больше нельзя взять", 1.4f, Pal.Red);
+            return;
+        }
         UI.HidePerks();
-        Run.AddPerk(def);
-        Time.timeScale = 1f;
         if (def.Id == "slot")
         {
             var skills = Run.RollSkills(3);
-            UI.ShowSkills(skills, "ВЫБЕРИ НОВЫЙ НАВЫК");
-            State = GameState.Perk;
-            Time.timeScale = 0f;
-            return;
+            if (skills.Count > 0)
+            {
+                UI.ShowSkills(skills, "ВЫБЕРИ НОВЫЙ НАВЫК");
+                State = GameState.Perk;
+                Time.timeScale = 0f;
+                return;
+            }
         }
         ContinueAfterChoice();
     }
@@ -440,8 +522,12 @@ public class Game : MonoBehaviour
     public void ChooseSkill(string id)
     {
         if (State != GameState.Perk) return;
+        if (!Skills.AddSkill(id))
+        {
+            UI.ShowBanner("НЕДОСТУПНО", "Этот навык уже изучен или нет свободного слота", 1.4f, Pal.Red);
+            return;
+        }
         UI.HideSkills();
-        Skills.AddSkill(id);
         ContinueAfterChoice();
     }
 

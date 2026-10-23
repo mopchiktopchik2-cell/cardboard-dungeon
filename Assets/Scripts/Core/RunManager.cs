@@ -88,6 +88,7 @@ public class RunManager : MonoBehaviour
                 if (owned > 0) continue;
             }
             if (IsPerkCapped(perk)) continue;
+            if (!Data.PerkAllowedForClass(perk.Id, MetaProgress.SelectedClass)) continue;
             candidates.Add(perk);
         }
 
@@ -118,6 +119,7 @@ public class RunManager : MonoBehaviour
         var candidates = new List<SkillDef>();
         foreach (var s in Data.Skills)
         {
+            if (!Data.SkillAllowedForClass(s.Id, MetaProgress.SelectedClass)) continue;
             if (!Game.I.Skills.HasSkill(s.Id)) candidates.Add(s);
         }
         var result = new List<SkillDef>();
@@ -133,8 +135,14 @@ public class RunManager : MonoBehaviour
     public bool AddPerk(PerkDef perk)
     {
         if (perk == null) return false;
+        if (!Data.PerkAllowedForClass(perk.Id, MetaProgress.SelectedClass)) return false;
         if (perk.Unique && PerkCounts.TryGetValue(perk.Id, out var owned) && owned > 0) return false;
         if (IsPerkCapped(perk)) return false;
+        if (perk.Id == "slot" &&
+            (Game.I == null || Game.I.Skills == null || Game.I.Skills.MaxSlots >= Data.MaxSkillSlots))
+        {
+            return false;
+        }
 
         PerkCounts[perk.Id] = (PerkCounts.TryGetValue(perk.Id, out var c) ? c : 0) + 1;
         TakenPerks.Add(perk);
@@ -155,7 +163,7 @@ public class RunManager : MonoBehaviour
                 Game.I.Player.Heal(20f);
                 break;
             case "lifesteal":
-                s.lifesteal += 0.05f;
+                s.lifesteal = Mathf.Min(Data.LifestealCap, s.lifesteal + Data.LifestealPerPerk);
                 break;
             case "crit":
                 s.critChance = Mathf.Min(0.75f, s.critChance + 0.10f);
@@ -220,7 +228,19 @@ public class RunManager : MonoBehaviour
             case "freeze": return s.freezeShot;
             case "poison": return s.poisonShot;
             case "secondwind": return s.secondWind;
-            case "slot": return skills != null && skills.MaxSlots >= Data.MaxSkillSlots;
+            case "lifesteal": return s.lifesteal >= Data.LifestealCap - 0.001f;
+            case "slot": return skills == null || skills.MaxSlots >= Data.MaxSkillSlots || !HasUnlearnedSkills();
+        }
+        return false;
+    }
+
+    public bool HasUnlearnedSkills()
+    {
+        if (Game.I == null || Game.I.Skills == null) return true;
+        foreach (var skill in Data.Skills)
+        {
+            if (!Data.SkillAllowedForClass(skill.Id, MetaProgress.SelectedClass)) continue;
+            if (!Game.I.Skills.HasSkill(skill.Id)) return true;
         }
         return false;
     }

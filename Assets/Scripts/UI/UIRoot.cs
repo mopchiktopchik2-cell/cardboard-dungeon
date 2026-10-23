@@ -63,6 +63,7 @@ public class UIRoot : MonoBehaviour
     private readonly List<Image> dungeonFrames = new List<Image>();
     private readonly List<Image> dungeonIcons = new List<Image>();
     private readonly List<Image> dungeonAccents = new List<Image>();
+    private readonly List<GameObject> dungeonLocks = new List<GameObject>();
     private readonly Text[] equipSlotNames = new Text[3];
     private readonly Text[] equipSlotStats = new Text[3];
     private readonly Image[] equipSlotIcons = new Image[3];
@@ -84,6 +85,7 @@ public class UIRoot : MonoBehaviour
     private Text pauseTitle;
 
     private Image hpFill;
+    private Image shieldFill;
     private Image bossFill;
     private Image dashIcon;
     private Image dashCooldown;
@@ -96,6 +98,9 @@ public class UIRoot : MonoBehaviour
     private Image lowHpImage;
     private RectTransform skipRoot;
     private Text skipText;
+    private Button nextDungeonButton;
+    private Button endRestartButton;
+    private Button endMenuButton;
 
     private SlotView[] slots;
     private Coroutine bannerRoutine;
@@ -323,7 +328,7 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.2", 20, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
@@ -360,6 +365,15 @@ public class UIRoot : MonoBehaviour
             dungeonFrames.Add(frameImg);
             dungeonIcons.Add(icon);
             dungeonAccents.Add(accent);
+
+            var lockBg = Img(frameImg.rectTransform, art.UI("white"), new Color(0.035f, 0.02f, 0.045f, 0.78f),
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+            TextAt(lockBg.rectTransform, "ЗАКРЫТО\n<size=11>победи в предыдущем</size>", 16,
+                new Color(0.95f, 0.58f, 0.48f), TextAnchor.MiddleCenter,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero,
+                art.Serif, true);
+            lockBg.gameObject.SetActive(false);
+            dungeonLocks.Add(lockBg.gameObject);
         }
 
         var summary = Img(menuRoot, art.UI("ui_card_dark", new Vector4(22f, 22f, 22f, 22f)),
@@ -420,7 +434,7 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
             new Vector2(1120f, 28f), art.Sans, true);
 
-        TextAt(menuRoot, "v1.2", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
+        TextAt(menuRoot, "v1.3", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
             new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 22f),
             new Vector2(120f, 24f), art.Sans, false);
 
@@ -501,6 +515,14 @@ public class UIRoot : MonoBehaviour
     public void SelectDungeon(int index)
     {
         var dungeon = Data.Dungeon(index);
+        if (dungeon == null) return;
+        if ((Game.I == null || !Game.I.QA) && !MetaProgress.IsDungeonUnlocked(index))
+        {
+            string previous = index > 0 ? Data.Dungeons[index - 1].Name : "предыдущем подземелье";
+            ShowBanner("ПУТЬ ЗАКРЫТ", "Сначала победи в: " + previous, 1.7f, Pal.Red);
+            if (Game.I != null && Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.5f, 0.7f);
+            return;
+        }
         MetaProgress.SelectedDungeonId = dungeon.Id;
         if (Game.I.Rooms != null) Game.I.Rooms.RebuildMenuForSelection();
         RefreshMenuSelection();
@@ -524,6 +546,16 @@ public class UIRoot : MonoBehaviour
         for (int i = 0; i < dungeonFrames.Count; i++)
         {
             bool selected = Data.Dungeons[i].Id == dungeon.Id;
+            bool unlocked = Game.I != null && Game.I.QA || MetaProgress.IsDungeonUnlocked(i);
+            if (dungeonLocks.Count > i) dungeonLocks[i].SetActive(!unlocked);
+            if (!unlocked)
+            {
+                dungeonFrames[i].color = new Color(0.42f, 0.4f, 0.45f, 0.9f);
+                dungeonIcons[i].color = new Color(0.55f, 0.53f, 0.56f, 0.6f);
+                dungeonAccents[i].color = new Color(Data.Dungeons[i].Accent.r, Data.Dungeons[i].Accent.g,
+                    Data.Dungeons[i].Accent.b, 0.1f);
+                continue;
+            }
             dungeonFrames[i].color = selected ? Color.white : new Color(0.58f, 0.56f, 0.62f, 0.92f);
             dungeonIcons[i].color = selected ? Color.white : new Color(0.7f, 0.68f, 0.7f, 0.8f);
             dungeonAccents[i].color = new Color(Data.Dungeons[i].Accent.r, Data.Dungeons[i].Accent.g,
@@ -682,6 +714,16 @@ public class UIRoot : MonoBehaviour
         hpFill.type = Image.Type.Sliced;
         hpFill.color = new Color(0.83f, 0.35f, 0.3f);
         hpFill.raycastTarget = false;
+
+        var shieldRt = MakeRect("shield", barBg.transform, Vector2.zero, Vector2.one,
+            new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
+        shieldRt.offsetMin = new Vector2(4f, 4f);
+        shieldRt.offsetMax = new Vector2(-4f, -4f);
+        shieldFill = shieldRt.gameObject.AddComponent<Image>();
+        shieldFill.sprite = art.UI("white");
+        shieldFill.color = new Color(0.48f, 0.78f, 1f, 0.9f);
+        shieldFill.raycastTarget = false;
+        shieldFill.enabled = false;
 
         hpText = TextAt(root, "120 / 120", 18, Color.white, TextAnchor.MiddleCenter,
             new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(232f, -45f),
@@ -966,8 +1008,9 @@ public class UIRoot : MonoBehaviour
             int idx = i;
             var def = CurrentSkills[i];
             float x = (i - (CurrentSkills.Count - 1) * 0.5f) * 350f;
+            float cooldown = Data.EffectiveCooldown(def, MetaProgress.SelectedClass);
             BuildCard(perkCardsRoot, new Vector2(x, 0f), def.Icon, def.Name,
-                def.Desc + "\n<color=#BFAF96>Перезарядка: " + def.Cooldown.ToString("0") + " сек.</color>",
+                def.Desc + "\n<color=#BFAF96>Перезарядка: " + cooldown.ToString("0") + " сек.</color>",
                 def.Color, (i + 1).ToString(), "НАВЫК",
                 () => ChooseSkillCard(idx));
         }
@@ -1315,10 +1358,12 @@ public class UIRoot : MonoBehaviour
             new Vector2(65f, -32f), new Vector2(340f, 94f), art.Sans, true);
         endLootStats.lineSpacing = 1.1f;
 
-        MakeButton(endPanel, "ЕЩЁ РАЗ", new Vector2(-120f, -378f), new Vector2(220f, 48f),
-            () => Game.I.RestartRun(), 23);
-        MakeButton(endPanel, "В МЕНЮ", new Vector2(120f, -378f), new Vector2(220f, 48f),
-            () => { Time.timeScale = 1f; Game.I.ToMenu(); }, 21, false);
+        nextDungeonButton = MakeButton(endPanel, "СЛЕДУЮЩЕЕ", new Vector2(-260f, -378f),
+            new Vector2(240f, 48f), () => Game.I.StartNextDungeon(), 21);
+        endRestartButton = MakeButton(endPanel, "ЕЩЁ РАЗ", new Vector2(0f, -378f),
+            new Vector2(200f, 48f), () => Game.I.RestartRun(), 21, false);
+        endMenuButton = MakeButton(endPanel, "В МЕНЮ", new Vector2(260f, -378f),
+            new Vector2(200f, 48f), () => { Time.timeScale = 1f; Game.I.ToMenu(); }, 20, false);
     }
 
     public void ShowEnd(bool victory, LootRoll loot = null)
@@ -1331,6 +1376,8 @@ public class UIRoot : MonoBehaviour
         var run = Game.I.Run;
         string time = FormatTime(run.RunTime);
         var dungeon = run.Dungeon;
+        var next = victory ? MetaProgress.NextDungeon(dungeon) : null;
+        bool hasNext = next != null;
         endStats.text =
             (victory
                 ? "БОСС ПОВЕРЖЕН. " + (dungeon != null ? dungeon.Name : "ПОДЗЕМЕЛЬЕ") + " затихло."
@@ -1341,10 +1388,32 @@ public class UIRoot : MonoBehaviour
             "\n<color=#E8C16D>Нанесено урона:</color> " + Mathf.RoundToInt(run.DamageDealt) +
             "\n<color=#E8C16D>Время:</color> " + time +
             "\n<color=#E8C16D>Лучший забег:</color> комната " + Mathf.Max(1, run.BestRoom) +
-            " · убито " + run.BestKills;
+            " · убито " + run.BestKills +
+            (victory
+                ? hasNext
+                    ? "\n<color=#8FD3C7>ОТКРЫТО:</color> " + next.Name + "  ·  N — идти дальше"
+                    : "\n<color=#8FD3C7>ВСЕ ПОДЗЕМЕЛЬЯ ПРОЙДЕНЫ</color>"
+                : "");
+
+        if (nextDungeonButton != null) nextDungeonButton.gameObject.SetActive(hasNext);
+        if (endRestartButton != null)
+        {
+            SetEndButtonX(endRestartButton, hasNext ? 0f : -110f);
+        }
+        if (endMenuButton != null)
+        {
+            SetEndButtonX(endMenuButton, hasNext ? 260f : 110f);
+        }
 
         if (endLoot != null) endLoot.text = "";
         ShowEndLoot(victory, loot, dungeon);
+    }
+
+    private static void SetEndButtonX(Button button, float x)
+    {
+        if (button == null) return;
+        var rt = button.GetComponent<RectTransform>();
+        if (rt != null) rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
     }
 
     private void ShowEndLoot(bool victory, LootRoll loot, DungeonDef dungeon)
@@ -1838,6 +1907,20 @@ public class UIRoot : MonoBehaviour
         {
             hpFill.rectTransform.anchorMax = new Vector2(Mathf.Max(0.001f, pct), 1f);
             hpFill.color = Color.Lerp(new Color(0.75f, 0.2f, 0.18f), new Color(0.86f, 0.42f, 0.3f), pct);
+        }
+        if (shieldFill != null)
+        {
+            float shieldPct = Mathf.Clamp01(p.Shield / Mathf.Max(1f, p.Stats.maxHp));
+            bool showShield = shieldPct > 0.002f && pct > 0.002f;
+            shieldFill.enabled = showShield;
+            if (showShield)
+            {
+                // Щит рисуется поверх правой части текущего HP, не выходя за его границу.
+                float start = Mathf.Max(0f, pct - shieldPct);
+                shieldFill.rectTransform.anchorMin = new Vector2(start, 0f);
+                shieldFill.rectTransform.anchorMax = new Vector2(pct, 1f);
+                shieldFill.color = new Color(0.48f, 0.78f, 1f, 0.88f);
+            }
         }
         if (hpText != null) hpText.text = Mathf.CeilToInt(p.Stats.hp) + " / " + Mathf.CeilToInt(p.Stats.maxHp);
         if (shieldText != null) shieldText.text = p.Shield > 0.5f ? "ЩИТ " + Mathf.CeilToInt(p.Shield) : "";

@@ -41,6 +41,13 @@ public class Enemy : MonoBehaviour
     private float dotTimer;
     private float dotDps;
     private float dotTick;
+    private float freezeTimer;
+    private float freezeTick;
+    private float freezeTickDamage;
+    private float avoidTimer;
+    private float avoidSign = 1f;
+    private float stuckTimer;
+    private Vector2 lastPos;
 
     public static Enemy Spawn(EnemyKind kind, Vector2 pos, float hpScale, float damageScale, bool elite = false)
     {
@@ -92,7 +99,8 @@ public class Enemy : MonoBehaviour
 
         spawnTimer = 0.4f;
         attackCd = Random.Range(0.25f, 0.8f);
-        specialCd = 1.5f;
+        specialCd = Random.Range(1.2f, 2.4f);
+        avoidSign = Random.value > 0.5f ? 1f : -1f;
         Game.I.Fx.Dust(transform.position, Boss ? 12 : 5, Boss ? 1.4f : 0.8f);
         if (Boss)
         {
@@ -115,6 +123,22 @@ public class Enemy : MonoBehaviour
             Visual.Walking = false;
             return;
         }
+        if (freezeTimer > 0f)
+        {
+            freezeTimer -= dt;
+            freezeTick -= dt;
+            Visual.Walking = false;
+            Visual.SetTint(new Color(0.55f, 0.88f, 1f));
+            if (freezeTick <= 0f)
+            {
+                freezeTick = 0.25f;
+                TakeDamage(freezeTickDamage, transform.position, true, false, true);
+                if (Dead) return;
+                UpdateBar();
+                Game.I.Fx.Dust(transform.position, 1, 0.35f);
+            }
+            return;
+        }
         if (stun > 0f)
         {
             stun -= dt;
@@ -135,6 +159,7 @@ public class Enemy : MonoBehaviour
                 dotTick = 0.7f;
                 TakeDamage(dotDps * 0.7f, transform.position, false, false);
                 if (Dead) return;
+                UpdateBar();
             }
         }
         if (contactCd > 0f) contactCd -= dt;
@@ -158,19 +183,27 @@ public class Enemy : MonoBehaviour
         attackCd -= dt;
         specialCd -= dt;
 
+        if (casting)
+        {
+            Visual.Walking = false;
+            Separate(dt);
+            UpdateBar();
+            return;
+        }
+
         switch (Def.Kind)
         {
             case EnemyKind.Imp:
-                MeleeAI(player, dir, dist, dt, 1f);
+                ImpAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Guard:
-                MeleeAI(player, dir, dist, dt, 0.9f);
+                GuardAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Spider:
-                MeleeAI(player, dir, dist, dt, 1.15f, true);
+                SpiderAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Skeleton:
-                ArcherAI(player, dir, dist, dt);
+                SkeletonAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Wraith:
                 WraithAI(player, dir, dist, dt);
@@ -185,10 +218,10 @@ public class Enemy : MonoBehaviour
                 BoarAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Hound:
-                BoarAI(player, dir, dist, dt);
+                HoundAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Executioner:
-                MeleeAI(player, dir, dist, dt, 0.78f);
+                ExecutionerAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Bomber:
                 BomberAI(player, dir, dist, dt);
@@ -223,6 +256,41 @@ public class Enemy : MonoBehaviour
     private bool BarVisible()
     {
         return barVisible || Elite;
+    }
+
+    private void ImpAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist < 7.4f)
+        {
+            specialCd = 5.6f;
+            StartCoroutine(FireSpit(player));
+            return;
+        }
+        MeleeAI(player, dir, dist, dt, 1.05f);
+    }
+
+    private IEnumerator FireSpit(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 dir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
+        Visual.Face(dir.x);
+        Visual.Windup(0.38f);
+        Visual.Flash(new Color(1f, 0.55f, 0.25f), 0.2f);
+        Game.I.Fx.Ring(transform.position, new Color(1f, 0.5f, 0.2f, 0.7f), 0.7f, 0.35f);
+        yield return new WaitForSeconds(0.38f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Vector2 aim = ((Vector2)player.transform.position + Vector2.up * 0.5f -
+                       ((Vector2)transform.position + Vector2.up * 0.8f)).normalized;
+        Visual.Attack(aim, 1.1f);
+        Projectile.Enemy((Vector2)transform.position + Vector2.up * 0.8f, aim, Damage * 1.1f, 9f,
+            "proj_fire", 1.1f, 0.22f, 4.2f);
+        Game.I.Audio.Play("sfx_fireball", 0.55f, 1.2f);
+        casting = false;
     }
 
     private void MeleeAI(Player player, Vector2 dir, float dist, float dt, float speedK, bool poison = false)
@@ -264,6 +332,43 @@ public class Enemy : MonoBehaviour
         }
     }
 
+    private void SkeletonAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist < 7.2f)
+        {
+            specialCd = 6.2f;
+            StartCoroutine(TripleShot(player));
+            return;
+        }
+        ArcherAI(player, dir, dist, dt);
+    }
+
+    private IEnumerator TripleShot(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 dir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
+        Visual.Face(dir.x);
+        Visual.Windup(0.42f);
+        Visual.Flash(new Color(0.95f, 0.9f, 0.72f), 0.2f);
+        yield return new WaitForSeconds(0.42f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.8f;
+        Vector2 baseDir = ((Vector2)player.transform.position + Vector2.up * 0.55f - origin).normalized;
+        for (int i = -1; i <= 1; i++)
+        {
+            Projectile.Enemy(origin, Rotate(baseDir, i * 9f), Damage * 0.72f, 10.5f,
+                "proj_arrow", 1.0f, 0.2f, 5f);
+        }
+        Visual.Attack(baseDir, 0.95f);
+        Game.I.Audio.Play("sfx_shoot", 0.55f, 0.9f);
+        casting = false;
+    }
+
     private void ArcherAI(Player player, Vector2 dir, float dist, float dt)
     {
         if (winding)
@@ -302,6 +407,73 @@ public class Enemy : MonoBehaviour
         }
     }
 
+    private void GuardAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist > 2.1f && dist < 7.8f)
+        {
+            specialCd = 7.8f;
+            StartCoroutine(ShieldCharge(player));
+            return;
+        }
+        MeleeAI(player, dir, dist, dt, 0.9f);
+    }
+
+    private IEnumerator ShieldCharge(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 start = transform.position;
+        Vector2 aim = ((Vector2)player.transform.position - start);
+        aim = aim.sqrMagnitude > 0.001f ? aim.normalized : Vector2.right;
+        Visual.Face(aim.x);
+        Visual.Windup(0.68f);
+        Visual.Flash(new Color(1f, 0.42f, 0.28f), 0.2f);
+        Game.I.Fx.Line(start + Vector2.up * 0.55f,
+            start + aim * 6.8f + Vector2.up * 0.55f, new Color(1f, 0.35f, 0.25f, 0.55f), 0.14f, 0.68f);
+        Game.I.Fx.Ring(start, new Color(1f, 0.4f, 0.25f, 0.8f), 1.2f, 0.68f);
+        Game.I.Audio.Play("sfx_boss_roar", 0.45f, 1.25f);
+        yield return new WaitForSeconds(0.68f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+
+        bool hit = false;
+        float t = 0f;
+        Visual.Attack(aim, 1.6f);
+        while (t < 0.52f)
+        {
+            t += Time.deltaTime;
+            Vector2 before = transform.position;
+            transform.position = Game.I.Rooms.Move(transform.position, aim * 10.8f * Time.deltaTime, radius);
+            Visual.Walking = true;
+            Game.I.Fx.Dust(transform.position, 1, 0.45f);
+            if (!hit && Vector2.Distance(transform.position, player.transform.position) < 0.95f)
+            {
+                hit = true;
+                if (player.Invuln <= 0f)
+                {
+                    player.TakeDamage(Damage * 1.35f, transform.position, false, false, this);
+                    player.Stun(1.15f);
+                    Game.I.Shake(0.28f, 0.4f);
+                    Game.I.Audio.Play("sfx_hit", 0.9f, 0.7f);
+                }
+            }
+            if (Vector2.Distance(before, transform.position) < 10.8f * Time.deltaTime * 0.28f)
+            {
+                stun = Mathf.Max(stun, 0.55f);
+                Game.I.Fx.Dust(transform.position, 7, 1.1f);
+                Game.I.Shake(0.16f, 0.25f);
+                break;
+            }
+            yield return null;
+        }
+        Visual.Walking = false;
+        casting = false;
+        attackCd = Def.Cooldown;
+    }
+
     private void WraithAI(Player player, Vector2 dir, float dist, float dt)
     {
         if (specialCd <= 0f && dist < 3.6f)
@@ -315,12 +487,18 @@ public class Enemy : MonoBehaviour
 
     private IEnumerator WraithBlink()
     {
+        casting = true;
+        Visual.Walking = false;
         Visual.SetVisible(false);
         Game.I.Fx.Burst("fx_soul", transform.position, 6, 1.2f, 0.35f, 0.3f,
             new Color(0.45f, 0.85f, 1f, 0.8f), 1600);
         Game.I.Audio.Play("sfx_dash", 0.55f, 0.8f);
         yield return new WaitForSeconds(0.22f);
-        if (Dead || Game.I == null) yield break;
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
         Vector2 p = Game.I.Rooms.RandomArenaPoint(1.8f);
         if (Vector2.Distance(p, Game.I.Player.transform.position) < 2.4f)
         {
@@ -330,10 +508,59 @@ public class Enemy : MonoBehaviour
         Visual.SetVisible(true);
         Visual.SpawnPop(0.3f);
         Game.I.Fx.Explosion(transform.position, 1.1f, new Color(0.4f, 0.8f, 1f));
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.8f;
+        Vector2 baseDir = ((Vector2)Game.I.Player.transform.position + Vector2.up * 0.55f - origin).normalized;
+        for (int i = -1; i <= 1; i++)
+        {
+            Projectile.Enemy(origin, Rotate(baseDir, i * 13f), Damage * 0.62f, 7.8f,
+                "proj_soul", 1.05f, 0.2f, 5f);
+        }
+        Visual.Attack(baseDir, 1f);
+        casting = false;
+    }
+
+    private void SpiderAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist < 6.4f)
+        {
+            specialCd = 6.4f;
+            StartCoroutine(WebSpit(player));
+            return;
+        }
+        MeleeAI(player, dir, dist, dt, 1.15f, true);
+    }
+
+    private IEnumerator WebSpit(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 dir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
+        Visual.Face(dir.x);
+        Visual.Windup(0.36f);
+        Visual.Flash(new Color(0.75f, 0.9f, 1f), 0.18f);
+        yield return new WaitForSeconds(0.36f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.7f;
+        Vector2 aim = ((Vector2)player.transform.position + Vector2.up * 0.55f - origin).normalized;
+        Projectile.Enemy(origin, aim, Damage * 0.65f, 9.5f, "proj_ice", 1.05f, 0.22f, 4.5f,
+            false, true);
+        Visual.Attack(aim, 0.8f);
+        Game.I.Audio.Play("sfx_cast", 0.45f, 1.25f);
+        casting = false;
     }
 
     private void PlagueAI(Player player, Vector2 dir, float dist, float dt)
     {
+        if (specialCd <= 0f && dist < 8.2f)
+        {
+            specialCd = 7.2f;
+            StartCoroutine(PlaguePool(player));
+            return;
+        }
         if (winding)
         {
             windup -= dt;
@@ -363,6 +590,27 @@ public class Enemy : MonoBehaviour
             Visual.Windup(windup);
             Visual.Flash(new Color(0.7f, 1f, 0.6f), 0.2f);
         }
+    }
+
+    private IEnumerator PlaguePool(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 target = player.transform.position;
+        Visual.Windup(0.55f);
+        Visual.Flash(new Color(0.65f, 1f, 0.5f), 0.22f);
+        Game.I.Fx.TelegraphedCircle(target, 1.9f, 0.55f, new Color(0.55f, 0.95f, 0.4f));
+        Game.I.Audio.Play("sfx_cast", 0.5f, 0.8f);
+        yield return new WaitForSeconds(0.55f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Hazard.Poison(target, 1.9f, Damage * 0.55f, 5f, false);
+        Game.I.Fx.Explosion(target, 1.9f, new Color(0.5f, 0.85f, 0.35f));
+        Game.I.Audio.Play("sfx_poison", 0.65f);
+        casting = false;
     }
 
     private void ShamanAI(Player player, Vector2 dir, float dist, float dt)
@@ -478,6 +726,58 @@ public class Enemy : MonoBehaviour
         MoveDir(dir, Def.Speed, dt);
     }
 
+    private void HoundAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist > 1.3f && dist < 7f)
+        {
+            specialCd = 5.8f;
+            StartCoroutine(HoundPounce(player));
+            return;
+        }
+        MeleeAI(player, dir, dist, dt, 1.12f);
+    }
+
+    private IEnumerator HoundPounce(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 target = player.transform.position;
+        Visual.Windup(0.4f);
+        Visual.Flash(new Color(1f, 0.72f, 0.4f), 0.18f);
+        Game.I.Fx.TelegraphedCircle(target, 1.2f, 0.4f, new Color(1f, 0.65f, 0.3f));
+        yield return new WaitForSeconds(0.4f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Vector2 start = transform.position;
+        target = Game.I.Rooms.Move(target, Vector2.zero, radius);
+        float t = 0f;
+        const float flight = 0.28f;
+        while (t < flight)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / flight);
+            transform.position = Vector2.Lerp(start, target, Mathf.SmoothStep(0f, 1f, k));
+            Visual.Walking = true;
+            Visual.Face(target.x - start.x);
+            if (k > 0.35f && k < 0.7f) Game.I.Fx.Afterimage(Visual.Main);
+            yield return null;
+        }
+        transform.position = target;
+        Game.I.Fx.Dust(transform.position, 6, 0.9f);
+        Game.I.Audio.Play("sfx_hit", 0.45f, 1.35f);
+        if (Vector2.Distance(transform.position, player.transform.position) < 1.25f &&
+            player.Invuln <= 0f)
+        {
+            player.TakeDamage(Damage * 1.3f, transform.position, false, false, this);
+        }
+        Visual.Walking = false;
+        casting = false;
+        attackCd = Def.Cooldown;
+    }
+
     private void BomberAI(Player player, Vector2 dir, float dist, float dt)
     {
         if (exploding)
@@ -524,6 +824,47 @@ public class Enemy : MonoBehaviour
         Game.I.Rooms.NotifyKilled(this);
         Visual.DeathAnim(Vector2.right, 0.35f);
         Destroy(gameObject, 0.4f);
+    }
+
+    private void ExecutionerAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist < 3.4f)
+        {
+            specialCd = 7f;
+            StartCoroutine(ExecutionSlam(player));
+            return;
+        }
+        MeleeAI(player, dir, dist, dt, 0.78f);
+    }
+
+    private IEnumerator ExecutionSlam(Player player)
+    {
+        casting = true;
+        Visual.Walking = false;
+        Vector2 dir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
+        Visual.Face(dir.x);
+        Vector2 impact = (Vector2)transform.position + dir * 1.45f;
+        Visual.Windup(0.75f);
+        Visual.Flash(new Color(1f, 0.38f, 0.3f), 0.22f);
+        Game.I.Fx.TelegraphedCircle(impact, 2.2f, 0.75f, new Color(1f, 0.3f, 0.25f));
+        Game.I.Audio.Play("sfx_boss_roar", 0.35f, 1.35f);
+        yield return new WaitForSeconds(0.75f);
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        {
+            casting = false;
+            yield break;
+        }
+        Visual.Attack(dir, 1.8f);
+        Game.I.Fx.Explosion(impact, 2.3f, new Color(1f, 0.42f, 0.28f));
+        Game.I.Shake(0.25f, 0.42f);
+        Game.I.Audio.Play("sfx_explosion", 0.7f);
+        if (Vector2.Distance(player.transform.position, impact) < 2.35f && player.Invuln <= 0f)
+        {
+            player.TakeDamage(Damage * 1.65f, impact, false, false, this);
+            player.Stun(0.7f);
+        }
+        casting = false;
+        attackCd = Def.Cooldown;
     }
 
     private void BossAI(Player player, Vector2 dir, float dist, float dt)
@@ -646,10 +987,35 @@ public class Enemy : MonoBehaviour
     private void MoveDir(Vector2 dir, float speed, float dt)
     {
         if (dir.sqrMagnitude < 0.001f) return;
-        Vector2 d = dir.normalized * speed * slowFactor * dt;
-        transform.position = Game.I.Rooms.Move(transform.position, d, radius);
-        Visual.Face(dir.x);
+        Vector2 desired = dir.normalized;
+        if (avoidTimer > 0f)
+        {
+            avoidTimer -= dt;
+            desired = Rotate(desired, 54f * avoidSign);
+        }
+        Vector2 steered = Game.I.Rooms.Steer(transform.position, desired, radius,
+            Mathf.Max(1.15f, radius * 3.2f), avoidSign);
+        Vector2 before = transform.position;
+        Vector2 delta = steered * speed * slowFactor * dt;
+        transform.position = Game.I.Rooms.Move(before, delta, radius);
+        Visual.Face(steered.x);
         Visual.Walking = true;
+
+        float moved = Vector2.Distance(before, transform.position);
+        if (moved < Mathf.Max(0.001f, delta.magnitude * 0.2f))
+        {
+            stuckTimer += dt;
+            if (stuckTimer > 0.55f)
+            {
+                stuckTimer = 0f;
+                avoidSign = -avoidSign;
+                avoidTimer = 0.55f;
+            }
+        }
+        else
+        {
+            stuckTimer = 0f;
+        }
     }
 
     private void Shoot(Player player, Vector2 dir, string sprite, float speed, float scale, bool poison = false)
@@ -689,6 +1055,25 @@ public class Enemy : MonoBehaviour
         if (Bar != null) Bar.Set(Hp / MaxHp, Visual.Main.sprite.bounds.size.y * Visual.SpriteScale + 0.22f);
     }
 
+    public void Freeze(float duration, float maxHpPercent)
+    {
+        if (Dead || duration <= 0f) return;
+        freezeTimer = Mathf.Max(freezeTimer, duration);
+        int ticks = Mathf.Max(1, Mathf.RoundToInt(duration / 0.25f));
+        freezeTickDamage = MaxHp * Mathf.Clamp01(maxHpPercent) / ticks;
+        freezeTick = Mathf.Min(freezeTick, 0.08f);
+        StopAllCoroutines();
+        casting = false;
+        winding = false;
+        dashing = false;
+        Visual.SetVisible(true);
+        Visual.Walking = false;
+        Visual.SetTint(new Color(0.55f, 0.88f, 1f));
+        Visual.Flash(new Color(0.65f, 0.95f, 1f), 0.2f);
+        Game.I.Fx.Ring(transform.position, new Color(0.55f, 0.9f, 1f, 0.8f), 0.85f, 0.35f);
+        Game.I.Audio.Play("sfx_ice", 0.55f, 1.15f);
+    }
+
     public void Slow(float duration, float factor = 0.5f)
     {
         slowTimer = Mathf.Max(slowTimer, duration);
@@ -704,11 +1089,12 @@ public class Enemy : MonoBehaviour
         Visual.Flash(new Color(0.7f, 1f, 0.6f), 0.15f);
     }
 
-    public void TakeDamage(float amount, Vector2 source, bool playerSource = true, bool crit = false)
+    public void TakeDamage(float amount, Vector2 source, bool playerSource = true, bool crit = false,
+        bool trueDamage = false)
     {
         if (Dead) return;
-        if (Def.Kind == EnemyKind.Guard) amount *= 0.68f;
-        if (Def.Kind == EnemyKind.Executioner) amount *= 0.86f;
+        if (!trueDamage && Def.Kind == EnemyKind.Guard) amount *= 0.68f;
+        if (!trueDamage && Def.Kind == EnemyKind.Executioner) amount *= 0.86f;
         Hp -= amount;
         if (playerSource)
         {
@@ -716,14 +1102,23 @@ public class Enemy : MonoBehaviour
             Game.I.Player.KillHeal(amount);
         }
         if (Bar != null && !BarVisible()) SetBar(true);
-        Visual.Flash(crit ? new Color(1f, 0.9f, 0.55f) : new Color(1f, 0.75f, 0.7f), 0.1f);
-        Visual.Hit((Vector2)transform.position - source, crit ? 1.3f : 0.8f);
-        Game.I.Fx.FloatingText(transform.position + Vector3.up * (1.5f * Visual.SpriteScale),
-            Mathf.RoundToInt(amount).ToString(), crit ? new Color(1f, 0.85f, 0.35f) : Pal.Cream,
-            crit ? 1.35f : 0.9f, crit);
-        if (playerSource && !crit) Game.I.Hitstop(0.012f);
-        knockback += (Vector2)(transform.position - (Vector3)source).normalized * 1.6f;
-        Game.I.Audio.Play("sfx_enemy_hit", 0.35f, 1.1f, 0.08f);
+        if (trueDamage)
+        {
+            Visual.Flash(new Color(0.65f, 0.95f, 1f), 0.08f);
+            Game.I.Fx.FloatingText(transform.position + Vector3.up * (1.5f * Visual.SpriteScale),
+                Mathf.RoundToInt(amount).ToString(), new Color(0.65f, 0.92f, 1f), 0.7f, false);
+        }
+        else
+        {
+            Visual.Flash(crit ? new Color(1f, 0.9f, 0.55f) : new Color(1f, 0.75f, 0.7f), 0.1f);
+            Visual.Hit((Vector2)transform.position - source, crit ? 1.3f : 0.8f);
+            Game.I.Fx.FloatingText(transform.position + Vector3.up * (1.5f * Visual.SpriteScale),
+                Mathf.RoundToInt(amount).ToString(), crit ? new Color(1f, 0.85f, 0.35f) : Pal.Cream,
+                crit ? 1.35f : 0.9f, crit);
+            if (playerSource && !crit) Game.I.Hitstop(0.012f);
+            knockback += (Vector2)(transform.position - (Vector3)source).normalized * 1.6f;
+            Game.I.Audio.Play("sfx_enemy_hit", 0.35f, 1.1f, 0.08f);
+        }
         if (Hp <= 0f)
         {
             Die(source);
@@ -759,5 +1154,13 @@ public class Enemy : MonoBehaviour
             Game.I.Rooms.BossDefeated();
         }
         Destroy(gameObject, Boss ? 1.6f : 0.8f);
+    }
+
+    private static Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float rad = degrees * Mathf.Deg2Rad;
+        float c = Mathf.Cos(rad);
+        float s = Mathf.Sin(rad);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
     }
 }
