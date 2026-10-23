@@ -64,6 +64,7 @@ public class UIRoot : MonoBehaviour
     private readonly List<Image> dungeonIcons = new List<Image>();
     private readonly List<Image> dungeonAccents = new List<Image>();
     private readonly List<GameObject> dungeonLocks = new List<GameObject>();
+    private readonly List<Button> dungeonButtons = new List<Button>();
     private readonly Text[] equipSlotNames = new Text[3];
     private readonly Text[] equipSlotStats = new Text[3];
     private readonly Image[] equipSlotIcons = new Image[3];
@@ -328,7 +329,7 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3", 20, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3.1", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
@@ -359,12 +360,14 @@ public class UIRoot : MonoBehaviour
             var dungeon = Data.Dungeons[i];
             string foot = "СЛОЖНОСТЬ: " + Data.DifficultyName(dungeon.Difficulty) +
                           " · ДОБЫЧА " + Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
+            int dungeonIndex = i;
             var frameImg = MakeMenuCard(menuRoot, new Vector2(415f, 120f - i * 104f), "ui_dungeon_" + dungeon.Id,
                 dungeon.Name, dungeon.Tagline, foot, dungeon.Accent, Data.DifficultyColor(dungeon.Difficulty),
-                () => SelectDungeon(i), out var icon, out var accent);
+                () => SelectDungeon(dungeonIndex), out var icon, out var accent);
             dungeonFrames.Add(frameImg);
             dungeonIcons.Add(icon);
             dungeonAccents.Add(accent);
+            dungeonButtons.Add(frameImg.GetComponent<Button>());
 
             var lockBg = Img(frameImg.rectTransform, art.UI("white"), new Color(0.035f, 0.02f, 0.045f, 0.78f),
                 Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
@@ -434,7 +437,7 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
             new Vector2(1120f, 28f), art.Sans, true);
 
-        TextAt(menuRoot, "v1.3", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
+        TextAt(menuRoot, "v1.3.1", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
             new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 22f),
             new Vector2(120f, 24f), art.Sans, false);
 
@@ -512,9 +515,16 @@ public class UIRoot : MonoBehaviour
         if (Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.55f);
     }
 
+    public void ClickDungeonCard(int index)
+    {
+        if (index < 0 || index >= dungeonButtons.Count) return;
+        dungeonButtons[index].onClick.Invoke();
+    }
+
     public void SelectDungeon(int index)
     {
-        var dungeon = Data.Dungeon(index);
+        if (index < 0 || index >= Data.Dungeons.Count) return;
+        var dungeon = Data.Dungeons[index];
         if (dungeon == null) return;
         if ((Game.I == null || !Game.I.QA) && !MetaProgress.IsDungeonUnlocked(index))
         {

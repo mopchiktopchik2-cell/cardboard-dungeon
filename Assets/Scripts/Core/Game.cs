@@ -117,8 +117,13 @@ public class Game : MonoBehaviour
         int dungeonIndex = Data.Dungeons.FindIndex(d => d.Id == dungeonId);
         if (dungeonIndex < 0) dungeonIndex = 0;
         dungeonId = Data.Dungeons[dungeonIndex].Id;
-        MetaProgress.SelectedDungeonId = dungeonId;
-        UI.SelectDungeon(dungeonIndex);
+        UI.ClickDungeonCard(dungeonIndex);
+        Debug.Log("[QA] dungeon card " + dungeonIndex + " -> " + MetaProgress.SelectedDungeonId);
+        if (MetaProgress.SelectedDungeonId != dungeonId)
+        {
+            Debug.LogError("[QA] dungeon card selected " + MetaProgress.SelectedDungeonId +
+                           " instead of " + dungeonId);
+        }
 
         HeroClass hero = HeroClass.Mage;
         if (classArg == "swordsman") hero = HeroClass.Swordsman;
