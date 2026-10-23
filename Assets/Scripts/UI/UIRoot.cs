@@ -29,6 +29,7 @@ public class UIRoot : MonoBehaviour
     private CanvasGroup pauseGroup;
     private CanvasGroup endGroup;
     private CanvasGroup bannerGroup;
+    private CanvasGroup equipGroup;
 
     private RectTransform perkCardsRoot;
     private RectTransform menuRoot;
@@ -36,8 +37,37 @@ public class UIRoot : MonoBehaviour
     private RectTransform restRoot;
     private RectTransform pausePanel;
     private RectTransform endPanel;
+    private RectTransform equipItemsRoot;
 
     private Text menuBest;
+    private Text menuClassTitle;
+    private Text menuClassStats;
+    private Text menuClassDesc;
+    private Text menuDungeonTitle;
+    private Text menuDungeonStats;
+    private Text equipHint;
+    private Text endLoot;
+    private RectTransform endLootCard;
+    private Image endLootIcon;
+    private Image endLootGlow;
+    private Image endLootFrame;
+    private Text endLootBadge;
+    private Text endLootName;
+    private Text endLootMeta;
+    private Text endLootStats;
+    private Image menuHero;
+    private Image menuDungeonTint;
+    private readonly List<Image> classFrames = new List<Image>();
+    private readonly List<Image> classIcons = new List<Image>();
+    private readonly List<Image> classAccents = new List<Image>();
+    private readonly List<Image> dungeonFrames = new List<Image>();
+    private readonly List<Image> dungeonIcons = new List<Image>();
+    private readonly List<Image> dungeonAccents = new List<Image>();
+    private readonly Text[] equipSlotNames = new Text[3];
+    private readonly Text[] equipSlotStats = new Text[3];
+    private readonly Image[] equipSlotIcons = new Image[3];
+
+    private string currentBossName = "ЛИЧ-ПЕРЕПЛЁТ";
     private Text roomText;
     private Text roomSub;
     private Text hpText;
@@ -89,6 +119,7 @@ public class UIRoot : MonoBehaviour
         BuildEnd();
         BuildBanner();
         BuildOverlays();
+        BuildEquipment();
         Debug.Log("[Cardboard] UI ready");
     }
 
@@ -247,94 +278,128 @@ public class UIRoot : MonoBehaviour
         menuGroup = NewGroup("Menu");
         menuRoot = menuGroup.GetComponent<RectTransform>();
 
-        // Layered dungeon backdrop: a cold arch, candlelight, drifting fog and embers.
         var backdrop = Img(menuRoot, art.UI("ui_menu_bg"), Color.white,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
         backdrop.preserveAspect = false;
         backdrop.raycastTarget = true;
 
+        menuDungeonTint = Img(menuRoot, art.UI("white"), new Color(0.2f, 0.2f, 0.3f, 0.08f),
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+
         var frame = Img(menuRoot, art.UI("ui_menu_frame"), Color.white,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
         frame.raycastTarget = false;
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
-            var fog = Img(menuRoot, art.UI("fx_glow"), new Color(0.42f, 0.48f, 0.72f, 0.055f),
+            var fog = Img(menuRoot, art.UI("fx_glow"), new Color(0.42f, 0.48f, 0.72f, 0.05f),
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(-380f + i * 250f, -220f + (i % 2) * 70f), new Vector2(760f, 400f), false);
+                new Vector2(-540f + i * 260f, -230f + (i % 2) * 80f), new Vector2(760f, 400f), false);
             var drift = fog.gameObject.AddComponent<UIDrift>();
-            drift.Init(new Vector2(80f, 34f), 0.12f + i * 0.02f, i * 1.7f, 0f);
+            drift.Init(new Vector2(80f, 34f), 0.1f + i * 0.018f, i * 1.7f, 0f);
         }
 
         var logoGlow = Img(menuRoot, art.UI("fx_glow"), new Color(0.55f, 0.27f, 0.65f, 0.16f),
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -40f), new Vector2(980f, 430f), false);
+            new Vector2(0f, -38f), new Vector2(980f, 430f), false);
         logoGlow.gameObject.AddComponent<UIPulseAlpha>().Init(0.12f, 0.24f, 0.42f);
 
-        var rune = Img(menuRoot, art.UI("ui_rune"), new Color(0.82f, 0.65f, 0.34f, 0.16f),
+        var rune = Img(menuRoot, art.UI("ui_rune"), new Color(0.82f, 0.65f, 0.34f, 0.12f),
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0f, 58f), new Vector2(650f, 650f), false);
-        rune.gameObject.AddComponent<UIRotate>().Speed = -4.5f;
-        rune.gameObject.AddComponent<UIPulseAlpha>().Init(0.10f, 0.19f, 0.26f);
+            new Vector2(0f, 30f), new Vector2(670f, 670f), false);
+        rune.gameObject.AddComponent<UIRotate>().Speed = -3.8f;
+        rune.gameObject.AddComponent<UIPulseAlpha>().Init(0.08f, 0.16f, 0.26f);
+
+        menuHero = Img(menuRoot, art.UI("wizard"), new Color(1f, 1f, 1f, 0.16f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 8f), new Vector2(255f, 360f), false);
+        menuHero.preserveAspect = true;
+        menuHero.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 5f), 0.38f, 1.2f);
 
         var logo = Img(menuRoot, art.UI("ui_logo"), Color.white,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -42f),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f),
             new Vector2(780f, 189f), false);
         logo.preserveAspect = true;
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.1", 21, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.2", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0.5f, 1f), new Vector2(0f, -247f), new Vector2(760f, 32f), art.Sans, true);
+            new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
-        Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.9f),
+        Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.85f),
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -278f), new Vector2(620f, 42f), false);
+            new Vector2(0f, -272f), new Vector2(680f, 42f), false);
 
-        for (int side = -1; side <= 1; side += 2)
+        TextAt(menuRoot, "ГЕРОЙ", 19, new Color(0.86f, 0.75f, 0.58f), TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-415f, 185f), new Vector2(380f, 28f), art.Serif, true);
+        TextAt(menuRoot, "ПОДЗЕМЕЛЬЕ", 19, new Color(0.86f, 0.75f, 0.58f), TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(415f, 185f), new Vector2(380f, 28f), art.Serif, true);
+
+        for (int i = 0; i < Data.HeroClasses.Count; i++)
         {
-            Img(menuRoot, art.UI("white"), new Color(0.72f, 0.55f, 0.32f, 0.2f),
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(side * 506f, 36f), new Vector2(2f, 530f), false);
-            var tick = Img(menuRoot, art.UI("white"), new Color(0.9f, 0.72f, 0.42f, 0.35f),
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(side * 506f, 36f), new Vector2(6f, 6f), false);
-            tick.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            var hero = Data.HeroClasses[i];
+            var frameImg = MakeMenuCard(menuRoot, new Vector2(-415f, 120f - i * 104f), hero.Sprite,
+                hero.Name, hero.Title, ClassFoot(hero), hero.Accent, new Color(0.82f, 0.78f, 0.7f),
+                () => SelectClass(hero.Id), out var icon, out var accent);
+            classFrames.Add(frameImg);
+            classIcons.Add(icon);
+            classAccents.Add(accent);
         }
 
-        var bestPanel = Img(menuRoot, art.UI("ui_panel_dark", new Vector4(18f, 18f, 18f, 18f)),
-            new Color(1f, 1f, 1f, 0.86f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-            new Vector2(0f, 0.5f), new Vector2(38f, 20f), new Vector2(456f, 84f), true);
-        bestPanel.raycastTarget = false;
-        var bestLabel = TextAt(bestPanel.rectTransform, "ЛУЧШИЙ ЗАБЕГ", 15,
-            new Color(0.76f, 0.65f, 0.48f), TextAnchor.UpperLeft,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f, -12f),
-            new Vector2(380f, 22f), art.Sans, false);
-        bestLabel.fontStyle = FontStyle.Bold;
-        menuBest = TextAt(bestPanel.rectTransform, "", 20, new Color(0.9f, 0.83f, 0.68f),
-            TextAnchor.LowerLeft, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
-            new Vector2(22f, 14f), new Vector2(410f, 36f), art.Sans, true);
-
-        MakeButton(menuRoot, "НАЧАТЬ ЗАБЕГ", new Vector2(0f, 82f), new Vector2(390f, 70f),
-            () => Game.I.StartRun(), 30);
-        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(0f, 2f), new Vector2(390f, 60f),
-            ToggleHelp, 25, false);
-        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(0f, -72f), new Vector2(320f, 52f),
-            () => Game.I.QuitGame(), 23, false);
-
-        for (int side = -1; side <= 1; side += 2)
+        for (int i = 0; i < Data.Dungeons.Count; i++)
         {
-            Img(menuRoot, art.UI("white"), new Color(0.8f, 0.62f, 0.36f, 0.5f),
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(side * 235f, 82f), new Vector2(44f, 2f), false);
-            var diamond = Img(menuRoot, art.UI("white"), new Color(0.95f, 0.78f, 0.46f, 0.8f),
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(side * 258f, 82f), new Vector2(7f, 7f), false);
-            diamond.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+            var dungeon = Data.Dungeons[i];
+            string foot = "СЛОЖНОСТЬ: " + Data.DifficultyName(dungeon.Difficulty) +
+                          " · ДОБЫЧА " + Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
+            var frameImg = MakeMenuCard(menuRoot, new Vector2(415f, 120f - i * 104f), "ui_dungeon_" + dungeon.Id,
+                dungeon.Name, dungeon.Tagline, foot, dungeon.Accent, Data.DifficultyColor(dungeon.Difficulty),
+                () => SelectDungeon(i), out var icon, out var accent);
+            dungeonFrames.Add(frameImg);
+            dungeonIcons.Add(icon);
+            dungeonAccents.Add(accent);
         }
 
-        for (int i = 0; i < 18; i++)
+        var summary = Img(menuRoot, art.UI("ui_card_dark", new Vector4(22f, 22f, 22f, 22f)),
+            new Color(1f, 1f, 1f, 0.88f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -28f), new Vector2(430f, 252f), true);
+        summary.raycastTarget = false;
+
+        menuClassTitle = TextAt(summary.rectTransform, "МАГ", 26, Pal.Gold, TextAnchor.UpperCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f),
+            new Vector2(390f, 34f), art.Serif, true);
+        menuClassStats = TextAt(summary.rectTransform, "", 14, new Color(0.86f, 0.8f, 0.66f),
+            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -48f), new Vector2(390f, 22f), art.Sans, true);
+        menuClassDesc = TextAt(summary.rectTransform, "", 13, new Color(0.78f, 0.74f, 0.7f),
+            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -72f), new Vector2(380f, 42f), art.Sans, true);
+        Img(summary.rectTransform, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.55f),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -122f),
+            new Vector2(340f, 24f), false);
+        menuDungeonTitle = TextAt(summary.rectTransform, "КОСТЯНОЙ СКЛЕП", 20, new Color(0.86f, 0.9f, 0.75f),
+            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -132f), new Vector2(390f, 26f), art.Serif, true);
+        menuDungeonStats = TextAt(summary.rectTransform, "", 13, new Color(0.82f, 0.78f, 0.7f),
+            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -160f), new Vector2(390f, 22f), art.Sans, true);
+        menuBest = TextAt(summary.rectTransform, "", 13, new Color(0.72f, 0.68f, 0.62f),
+            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -188f), new Vector2(390f, 36f), art.Sans, true);
+
+        MakeButton(menuRoot, "СПУСТИТЬСЯ", new Vector2(0f, -232f), new Vector2(430f, 64f),
+            () => Game.I.StartRun(), 29);
+
+        MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-170f, -314f), new Vector2(160f, 46f),
+            ShowEquipment, 17, false);
+        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(0f, -314f), new Vector2(160f, 46f),
+            ToggleHelp, 17, false);
+        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(170f, -314f), new Vector2(160f, 46f),
+            () => Game.I.QuitGame(), 17, false);
+
+        for (int i = 0; i < 24; i++)
         {
             var ember = Img(menuRoot, art.UI("fx_ember"),
                 i % 3 == 0 ? new Color(1f, 0.55f, 0.22f, 0.55f) : new Color(1f, 0.72f, 0.36f, 0.4f),
@@ -355,11 +420,152 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
             new Vector2(1120f, 28f), art.Sans, true);
 
-        TextAt(menuRoot, "v1.1", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
+        TextAt(menuRoot, "v1.2", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
             new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 22f),
             new Vector2(120f, 24f), art.Sans, false);
 
         BuildHelp();
+        RefreshMenuSelection();
+    }
+
+    private static string ClassFoot(HeroClassDef hero)
+    {
+        return "HP " + hero.Hp.ToString("0") + "  ·  УРОН " + hero.Damage.ToString("0.#") +
+               "  ·  " + (hero.Style == HeroAttackStyle.Slash ? "БЛИЖНИЙ БОЙ" : "ДАЛЬНИЙ БОЙ");
+    }
+
+    private Image MakeMenuCard(Transform parent, Vector2 pos, string icon, string title, string sub, string foot,
+        Color accent, Color footColor, UnityAction action, out Image iconImage, out Image accentImage)
+    {
+        var rt = MakeRect("menu_card_" + title, parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), pos, new Vector2(380f, 92f));
+        var bg = rt.gameObject.AddComponent<Image>();
+        bg.sprite = art.UI("ui_card_dark", new Vector4(18f, 18f, 18f, 18f));
+        bg.type = Image.Type.Sliced;
+        bg.color = Color.white;
+        bg.raycastTarget = true;
+
+        accentImage = Img(rt, art.UI("white"), new Color(accent.r, accent.g, accent.b, 0.9f),
+            new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(2f, 0f),
+            new Vector2(5f, -14f), false);
+        accentImage.rectTransform.offsetMin = new Vector2(2f, 14f);
+        accentImage.rectTransform.offsetMax = new Vector2(7f, -14f);
+
+        var iconRt = MakeRect("icon", rt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(18f, 0f), new Vector2(64f, 78f));
+        iconImage = iconRt.gameObject.AddComponent<Image>();
+        iconImage.sprite = art.UI(icon);
+        iconImage.color = Color.white;
+        iconImage.preserveAspect = true;
+        iconImage.raycastTarget = false;
+
+        var titleText = TextAt(rt, title, 20, new Color(0.94f, 0.87f, 0.74f), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(94f, -10f),
+            new Vector2(270f, 26f), art.Serif, true);
+        titleText.color = accent;
+        TextAt(rt, sub, 13, new Color(0.8f, 0.76f, 0.7f), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(94f, -38f),
+            new Vector2(272f, 20f), art.Sans, true);
+        TextAt(rt, foot, 12, footColor, TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(94f, -62f),
+            new Vector2(272f, 20f), art.Sans, true);
+
+        var btn = rt.gameObject.AddComponent<Button>();
+        btn.targetGraphic = bg;
+        btn.transition = Selectable.Transition.None;
+        var nav = btn.navigation;
+        nav.mode = Navigation.Mode.None;
+        btn.navigation = nav;
+        btn.onClick.AddListener(() =>
+        {
+            if (Game.I != null && Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.7f);
+            action?.Invoke();
+        });
+        var fx = rt.gameObject.AddComponent<UIButtonFx>();
+        fx.Init(rt, bg, bg.sprite);
+        return bg;
+    }
+
+    public void SelectClass(HeroClass hero)
+    {
+        MetaProgress.SelectedClass = hero;
+        if (Game.I.Player != null)
+        {
+            Game.I.Player.SetClassVisual(hero);
+            Game.I.Player.ShowInMenu();
+        }
+        RefreshMenuSelection();
+        if (Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.55f);
+    }
+
+    public void SelectDungeon(int index)
+    {
+        var dungeon = Data.Dungeon(index);
+        MetaProgress.SelectedDungeonId = dungeon.Id;
+        if (Game.I.Rooms != null) Game.I.Rooms.RebuildMenuForSelection();
+        RefreshMenuSelection();
+        if (Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.55f);
+    }
+
+    private void RefreshMenuSelection()
+    {
+        if (menuRoot == null) return;
+        var hero = MetaProgress.SelectedHero;
+        var dungeon = MetaProgress.SelectedDungeon;
+
+        for (int i = 0; i < classFrames.Count; i++)
+        {
+            bool selected = i == (int)MetaProgress.SelectedClass;
+            classFrames[i].color = selected ? Color.white : new Color(0.58f, 0.56f, 0.62f, 0.92f);
+            classIcons[i].color = selected ? Color.white : new Color(0.7f, 0.68f, 0.7f, 0.8f);
+            classAccents[i].color = new Color(Data.HeroClasses[i].Accent.r, Data.HeroClasses[i].Accent.g,
+                Data.HeroClasses[i].Accent.b, selected ? 1f : 0.25f);
+        }
+        for (int i = 0; i < dungeonFrames.Count; i++)
+        {
+            bool selected = Data.Dungeons[i].Id == dungeon.Id;
+            dungeonFrames[i].color = selected ? Color.white : new Color(0.58f, 0.56f, 0.62f, 0.92f);
+            dungeonIcons[i].color = selected ? Color.white : new Color(0.7f, 0.68f, 0.7f, 0.8f);
+            dungeonAccents[i].color = new Color(Data.Dungeons[i].Accent.r, Data.Dungeons[i].Accent.g,
+                Data.Dungeons[i].Accent.b, selected ? 1f : 0.25f);
+        }
+
+        if (menuHero != null)
+        {
+            menuHero.sprite = art.UI(hero.Sprite);
+            menuHero.color = new Color(Data.Hero(hero.Id).Accent.r, Data.Hero(hero.Id).Accent.g,
+                Data.Hero(hero.Id).Accent.b, 0.24f);
+        }
+        if (menuDungeonTint != null)
+        {
+            menuDungeonTint.color = new Color(dungeon.Accent.r, dungeon.Accent.g, dungeon.Accent.b, 0.11f);
+        }
+        if (menuClassTitle != null) menuClassTitle.text = hero.Name;
+        if (menuClassStats != null)
+        {
+            menuClassStats.text = "HP " + hero.Hp.ToString("0") + "  ·  УРОН " + hero.Damage.ToString("0.#") +
+                                  "  ·  " + (hero.Style == HeroAttackStyle.Slash ? "БЛИЖНИЙ БОЙ" : "ДАЛЬНИЙ БОЙ");
+        }
+        if (menuClassDesc != null) menuClassDesc.text = hero.Desc;
+        if (menuDungeonTitle != null)
+        {
+            menuDungeonTitle.text = dungeon.Name;
+            menuDungeonTitle.color = dungeon.Accent;
+        }
+        if (menuDungeonStats != null)
+        {
+            menuDungeonStats.text = Data.DifficultyName(dungeon.Difficulty) + "  ·  ШАНС ДОБЫЧИ " +
+                                    Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
+        }
+        if (menuBest != null)
+        {
+            int best = MetaProgress.BestRoom(dungeon.Id);
+            int kills = MetaProgress.BestKills(dungeon.Id);
+            int clears = MetaProgress.Clears(dungeon.Id);
+            menuBest.text = best > 0
+                ? "ЛУЧШИЙ: КОМНАТА " + best + "  ·  УБИТО " + kills + "  ·  ПОБЕД " + clears
+                : "ЭТО ПОДЗЕМЕЛЬЕ ЕЩЁ НЕ ПРОЙДЕНО";
+        }
     }
 
     private void BuildHelp()
@@ -385,13 +591,14 @@ public class UIRoot : MonoBehaviour
             new Vector2(600f, 60f), art.Serif, true);
 
         string body =
-            "<color=#E8C16D>WASD / стрелки</color> — движение\n" +
-            "Маг стреляет сам в ближайшего врага.\n\n" +
+            "<color=#E8C16D>WASD / стрелки</color> — движение. Атака происходит сама.\n" +
+            "Маг бьёт снарядами, мечник — широким размахом, рейнджер — быстрыми стрелами.\n\n" +
             "<color=#E8C16D>1 2 3 4 5</color> — активные навыки. Перезарядка видна на слотах.\n\n" +
             "<color=#E8C16D>SPACE</color> — рывок. Короткая неуязвимость.\n\n" +
             "<color=#E8C16D>ESC</color> — пауза, настройки громкости и выход в меню.\n\n" +
-            "Зачищай комнаты, выбирай перки и новые навыки. " +
-            "После каждой комнаты маг идёт дальше — впереди 12 залов и Лич-Переплёт.";
+            "В меню выбери героя и одно из трёх подземелий. У каждого свой декор, враги и босс. " +
+            "После победы снаряжение может выпасть — чем выше сложность, тем лучше награда. " +
+            "Надетые предметы сохраняются между забегами.";
 
         TextAt(panelRt, body, 21, Pal.Cream, TextAnchor.UpperLeft,
             new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f),
@@ -413,10 +620,15 @@ public class UIRoot : MonoBehaviour
     }
 
     public bool HelpOpen => helpPanel != null && helpPanel.gameObject.activeSelf;
+    public bool EquipmentOpen => equipGroup != null && equipGroup.gameObject.activeSelf;
+    public bool MenuOverlayOpen => HelpOpen || EquipmentOpen;
+    public bool RestScreenOpen => restMode;
+    public bool SkillScreenOpen => skillMode;
 
     public void ShowMenu()
     {
         if (helpPanel != null) helpPanel.gameObject.SetActive(false);
+        SetGroup(equipGroup, false);
         ResetLowHp();
         SetGroup(menuGroup, true);
         SetGroup(hudGroup, false);
@@ -424,19 +636,13 @@ public class UIRoot : MonoBehaviour
         SetGroup(pauseGroup, false);
         SetGroup(endGroup, false);
         SetGroup(bannerGroup, false);
-        if (menuBest != null)
-        {
-            var run = Game.I.Run;
-            string best = run.BestRoom > 0
-                ? "КОМНАТА " + run.BestRoom + "  ·  УБИТО " + run.BestKills
-                : "—";
-            menuBest.text = best;
-        }
+        RefreshMenuSelection();
         if (skipRoot != null) skipRoot.gameObject.SetActive(false);
     }
 
     public void HideMenu()
     {
+        SetGroup(equipGroup, false);
         SetGroup(menuGroup, false);
     }
 
@@ -626,10 +832,13 @@ public class UIRoot : MonoBehaviour
         var room = Game.I.Rooms.CurrentRoom;
         if (roomText != null)
         {
-            roomText.text = room == null ? "" : "КОМНАТА " + (run.RoomIndex + 1) + " / " + Data.RoomCount;
+            roomText.text = room == null ? "" : "КОМНАТА " + (run.RoomIndex + 1) + " / " + run.RoomCount;
             roomText.color = room == null ? Pal.Gold : Data.RoomAccent(room.Type);
         }
-        if (roomSub != null) roomSub.text = room == null ? "" : room.Name;
+        if (roomSub != null)
+        {
+            roomSub.text = room == null ? "" : room.Name + "  ·  " + run.Dungeon.Name;
+        }
     }
 
     public void RefreshSkills()
@@ -671,15 +880,16 @@ public class UIRoot : MonoBehaviour
         }
     }
 
-    public void ShowBossBar(bool show)
+    public void ShowBossBar(bool show, string name = null)
     {
+        if (!string.IsNullOrEmpty(name)) currentBossName = name;
         if (bossGroup != null) bossGroup.gameObject.SetActive(show);
-        if (show && bossName != null) bossName.text = "ЛИЧ-ПЕРЕПЛЁТ";
+        if (show && bossName != null) bossName.text = currentBossName;
     }
 
     public void BossPhase()
     {
-        if (bossName != null) bossName.text = "ЛИЧ-ПЕРЕПЛЁТ  ·  ФАЗА II";
+        if (bossName != null) bossName.text = currentBossName + "  ·  ФАЗА II";
         Flash(new Color(0.5f, 0.2f, 0.7f, 0.3f), 0.5f);
     }
 
@@ -1039,7 +1249,7 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false, true);
 
         endPanel = MakeRect("EndPanel", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720f, 640f));
+            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(800f, 840f));
         var panel = endPanel.gameObject.AddComponent<Image>();
         panel.sprite = art.UI("white");
         panel.type = Image.Type.Simple;
@@ -1048,25 +1258,70 @@ public class UIRoot : MonoBehaviour
         Img(endPanel, art.UI("ui_panel", new Vector4(28f, 28f, 28f, 28f)), Color.white,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, true, false);
 
-        endTitle = TextAt(endPanel, "ПОБЕДА", 62, Pal.Gold, TextAnchor.MiddleCenter,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -36f),
-            new Vector2(620f, 76f), art.Serif, true);
+        endTitle = TextAt(endPanel, "ПОБЕДА", 58, Pal.Gold, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -30f),
+            new Vector2(660f, 70f), art.Serif, true);
 
-        endStats = TextAt(endPanel, "", 22, Pal.Cream, TextAnchor.UpperCenter,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -124f),
-            new Vector2(600f, 250f), art.Sans, true);
+        endStats = TextAt(endPanel, "", 19, Pal.Cream, TextAnchor.UpperCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f),
+            new Vector2(680f, 180f), art.Sans, true);
 
-        MakeButton(endPanel, "ЕЩЁ РАЗ", new Vector2(0f, -64f), new Vector2(340f, 60f),
-            () => Game.I.RestartRun(), 26);
-        MakeButton(endPanel, "В МЕНЮ", new Vector2(0f, -138f), new Vector2(340f, 50f),
-            () => { Time.timeScale = 1f; Game.I.ToMenu(); }, 23, false);
+        endLoot = TextAt(endPanel, "", 16, Pal.Cream, TextAnchor.UpperCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -288f),
+            new Vector2(700f, 66f), art.Sans, true);
 
-        TextAt(endPanel, "R — быстрый перезапуск", 16, new Color(0.78f, 0.72f, 0.62f),
-            TextAnchor.MiddleLeft, new Vector2(0f, 0f), new Vector2(0f, 0f),
-            new Vector2(0f, 0f), new Vector2(24f, 16f), new Vector2(320f, 24f), art.Sans, true);
+        endLootCard = MakeRect("LootCard", endPanel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -100f), new Vector2(560f, 300f));
+        var cardBg = endLootCard.gameObject.AddComponent<Image>();
+        cardBg.sprite = art.UI("white");
+        cardBg.type = Image.Type.Simple;
+        cardBg.color = new Color(0.05f, 0.035f, 0.055f, 0.98f);
+        cardBg.raycastTarget = false;
+        endLootFrame = Img(endLootCard, art.UI("ui_panel", new Vector4(24f, 24f, 24f, 24f)),
+            new Color(0.55f, 0.45f, 0.34f, 0.9f), Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
+            Vector2.zero, Vector2.zero, true, false);
+        endLootGlow = Img(endLootCard, art.UI("fx_glow"), new Color(0.85f, 0.65f, 0.3f, 0.16f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-185f, 10f), new Vector2(250f, 250f), false, false);
+        endLootGlow.preserveAspect = true;
+        Img(endLootCard, art.UI("ui_panel", new Vector4(18f, 18f, 18f, 18f)),
+            new Color(0.02f, 0.012f, 0.03f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(-185f, 10f), new Vector2(150f, 150f), true, false);
+        var lootIconRt = MakeRect("icon", endLootCard, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(-185f, 10f), new Vector2(116f, 116f));
+        endLootIcon = lootIconRt.gameObject.AddComponent<Image>();
+        endLootIcon.preserveAspect = true;
+        endLootIcon.raycastTarget = false;
+
+        endLootBadge = TextAt(endLootCard, "НОВОЕ СНАРЯЖЕНИЕ", 13, Pal.Gold, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(65f, 116f), new Vector2(340f, 24f), art.Sans, true);
+        endLootBadge.fontStyle = FontStyle.Bold;
+
+        endLootName = TextAt(endLootCard, "", 24, Pal.Cream, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(65f, 76f), new Vector2(340f, 46f), art.Serif, true);
+        endLootName.fontStyle = FontStyle.Bold;
+        endLootName.resizeTextForBestFit = true;
+        endLootName.resizeTextMinSize = 16;
+        endLootName.resizeTextMaxSize = 24;
+
+        endLootMeta = TextAt(endLootCard, "", 15, new Color(0.78f, 0.72f, 0.63f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(65f, 42f), new Vector2(340f, 26f), art.Sans, true);
+
+        endLootStats = TextAt(endLootCard, "", 17, Pal.Cream, TextAnchor.UpperCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(65f, -32f), new Vector2(340f, 94f), art.Sans, true);
+        endLootStats.lineSpacing = 1.1f;
+
+        MakeButton(endPanel, "ЕЩЁ РАЗ", new Vector2(-120f, -378f), new Vector2(220f, 48f),
+            () => Game.I.RestartRun(), 23);
+        MakeButton(endPanel, "В МЕНЮ", new Vector2(120f, -378f), new Vector2(220f, 48f),
+            () => { Time.timeScale = 1f; Game.I.ToMenu(); }, 21, false);
     }
 
-    public void ShowEnd(bool victory)
+    public void ShowEnd(bool victory, LootRoll loot = null)
     {
         ResetLowHp();
         SetGroup(hudGroup, false);
@@ -1075,22 +1330,286 @@ public class UIRoot : MonoBehaviour
         endTitle.color = victory ? Pal.Gold : new Color(0.85f, 0.3f, 0.28f);
         var run = Game.I.Run;
         string time = FormatTime(run.RunTime);
+        var dungeon = run.Dungeon;
         endStats.text =
             (victory
-                ? "Лич-Переплёт разорван на клочки.\nПодземелье затихло."
-                : "Картонный маг пал.\nНо лист можно перевернуть.") +
-            "\n\n<color=#E8C16D>Комнат пройдено:</color> " + (run.RoomIndex + (victory ? 1 : 0)) +
-            " / " + Data.RoomCount +
+                ? "БОСС ПОВЕРЖЕН. " + (dungeon != null ? dungeon.Name : "ПОДЗЕМЕЛЬЕ") + " затихло."
+                : "ГЕРОЙ ПАЛ. Но лист можно перевернуть.") +
+            "\n<color=#E8C16D>Комнат пройдено:</color> " + (run.RoomIndex + (victory ? 1 : 0)) +
+            " / " + run.RoomCount +
             "\n<color=#E8C16D>Убито врагов:</color> " + run.Kills +
             "\n<color=#E8C16D>Нанесено урона:</color> " + Mathf.RoundToInt(run.DamageDealt) +
             "\n<color=#E8C16D>Время:</color> " + time +
             "\n<color=#E8C16D>Лучший забег:</color> комната " + Mathf.Max(1, run.BestRoom) +
             " · убито " + run.BestKills;
+
+        if (endLoot != null) endLoot.text = "";
+        ShowEndLoot(victory, loot, dungeon);
+    }
+
+    private void ShowEndLoot(bool victory, LootRoll loot, DungeonDef dungeon)
+    {
+        if (endLootCard == null) return;
+        endLootCard.gameObject.SetActive(true);
+        endLootIcon.color = Color.white;
+        endLootName.color = Pal.Cream;
+        endLootBadge.color = Pal.Gold;
+        endLootGlow.color = new Color(0.85f, 0.65f, 0.3f, 0.16f);
+        endLootFrame.color = new Color(0.55f, 0.45f, 0.34f, 0.9f);
+        endLootMeta.color = new Color(0.78f, 0.72f, 0.63f);
+        endLootStats.color = Pal.Cream;
+
+        if (loot != null && loot.Item != null)
+        {
+            var item = loot.Item;
+            var col = Data.RarityColor(item.Rarity);
+            endLootBadge.text = "НОВОЕ СНАРЯЖЕНИЕ";
+            endLootBadge.color = col;
+            endLootName.text = item.Name;
+            endLootName.color = col;
+            endLootMeta.text = Data.RarityName(item.Rarity) + " · " + Data.SlotName(item.Slot);
+            endLootStats.text = item.StatLine();
+            endLootIcon.sprite = art.UI(item.Icon);
+            endLootGlow.color = new Color(col.r, col.g, col.b, 0.24f);
+            endLootFrame.color = new Color(col.r, col.g, col.b, 0.85f);
+            return;
+        }
+
+        endLootIcon.sprite = art.UI("prop_chest");
+        if (victory && loot != null && loot.AllOwned)
+        {
+            endLootBadge.text = "АРСЕНАЛ СОБРАН";
+            endLootBadge.color = Pal.Gold;
+            endLootName.text = "ВСЁ УЖЕ ТВОЁ";
+            endLootName.color = Pal.Gold;
+            endLootMeta.text = "ВСЁ СНАРЯЖЕНИЕ ЭТОГО УРОВНЯ";
+            endLootStats.text = "Повышай сложность, чтобы найти более редкие вещи.";
+            endLootIcon.color = new Color(0.9f, 0.8f, 0.55f, 0.85f);
+            return;
+        }
+
+        if (victory)
+        {
+            int chance = dungeon != null ? Mathf.RoundToInt(dungeon.DropChance * 100f) : 0;
+            endLootBadge.text = "БЕЗ ДОБЫЧИ";
+            endLootBadge.color = new Color(0.7f, 0.64f, 0.55f);
+            endLootName.text = "СУНДУК ПУСТ";
+            endLootName.color = new Color(0.82f, 0.76f, 0.66f);
+            endLootMeta.text = "ШАНС ДОБЫЧИ БЫЛ " + chance + "%";
+            endLootStats.text = "Соберись с силами и попробуй ещё.\nДобыча не гарантирована.";
+            endLootIcon.color = new Color(0.5f, 0.46f, 0.42f, 0.65f);
+            endLootGlow.color = new Color(0.4f, 0.35f, 0.3f, 0.08f);
+            return;
+        }
+
+        endLootBadge.text = "ТОЛЬКО ЗА ПОБЕДУ";
+        endLootBadge.color = new Color(0.85f, 0.3f, 0.28f);
+        endLootName.text = "СНАРЯЖЕНИЕ ЖДЁТ";
+        endLootName.color = new Color(0.85f, 0.3f, 0.28f);
+        endLootMeta.text = "ПОБЕДИ БОССА";
+        endLootStats.text = "Добыча достаётся только тем, кто доходит до конца подземелья.";
+        endLootIcon.color = new Color(0.45f, 0.4f, 0.38f, 0.55f);
+        endLootGlow.color = new Color(0.4f, 0.2f, 0.2f, 0.07f);
     }
 
     public void HideEnd()
     {
         SetGroup(endGroup, false);
+    }
+
+    // ------------------------------------------------------------------ снаряжение
+    private void BuildEquipment()
+    {
+        equipGroup = NewGroup("Equipment");
+        var root = equipGroup.GetComponent<RectTransform>();
+        Img(root, art.UI("white"), new Color(0.02f, 0.01f, 0.03f, 0.8f), Vector2.zero, Vector2.one,
+            new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false, true);
+
+        var panel = MakeRect("EquipPanel", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1120f, 780f));
+        var bg = panel.gameObject.AddComponent<Image>();
+        bg.sprite = art.UI("white");
+        bg.type = Image.Type.Simple;
+        bg.color = new Color(0.055f, 0.035f, 0.065f, 1f);
+        bg.raycastTarget = true;
+        Img(panel, art.UI("ui_panel", new Vector4(28f, 28f, 28f, 28f)), Color.white,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, true, false);
+
+        TextAt(panel, "СНАРЯЖЕНИЕ", 44, Pal.Gold, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -22f),
+            new Vector2(700f, 54f), art.Serif, true);
+        TextAt(panel, "НАДЕТЫЕ ПРЕДМЕТЫ СОХРАНЯЮТСЯ МЕЖДУ ЗАБЕГАМИ", 14,
+            new Color(0.75f, 0.7f, 0.62f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -66f),
+            new Vector2(700f, 24f), art.Sans, true);
+
+        for (int i = 0; i < 3; i++)
+        {
+            var slot = (EquipSlot)i;
+            float x = -360f + i * 360f;
+            var slotRt = MakeRect("equip_slot_" + slot, panel, new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 185f),
+                new Vector2(320f, 146f));
+            var slotBg = slotRt.gameObject.AddComponent<Image>();
+            slotBg.sprite = art.UI("ui_card_dark", new Vector4(18f, 18f, 18f, 18f));
+            slotBg.type = Image.Type.Sliced;
+            slotBg.color = new Color(1f, 1f, 1f, 0.9f);
+            slotBg.raycastTarget = false;
+
+            TextAt(slotRt, Data.SlotName(slot), 14, new Color(0.8f, 0.7f, 0.55f), TextAnchor.UpperLeft,
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -12f),
+                new Vector2(180f, 22f), art.Sans, true);
+
+            var iconRt = MakeRect("icon", slotRt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f), new Vector2(18f, -10f), new Vector2(64f, 64f));
+            equipSlotIcons[i] = iconRt.gameObject.AddComponent<Image>();
+            equipSlotIcons[i].preserveAspect = true;
+            equipSlotIcons[i].raycastTarget = false;
+
+            equipSlotNames[i] = TextAt(slotRt, "ПУСТО", 16, new Color(0.7f, 0.66f, 0.6f),
+                TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(92f, -38f), new Vector2(210f, 24f), art.Serif, true);
+            equipSlotStats[i] = TextAt(slotRt, "", 11, new Color(0.75f, 0.7f, 0.64f),
+                TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                new Vector2(92f, -64f), new Vector2(212f, 40f), art.Sans, true);
+
+            var unequip = MakeButton(slotRt, "СНЯТЬ", new Vector2(112f, -50f), new Vector2(88f, 30f),
+                () =>
+                {
+                    MetaProgress.Unequip(slot);
+                    RefreshEquipment();
+                }, 13, false);
+            unequip.GetComponent<RectTransform>().anchorMin = new Vector2(1f, 0f);
+            unequip.GetComponent<RectTransform>().anchorMax = new Vector2(1f, 0f);
+            unequip.GetComponent<RectTransform>().pivot = new Vector2(1f, 0f);
+            unequip.GetComponent<RectTransform>().anchoredPosition = new Vector2(-14f, 12f);
+        }
+
+        TextAt(panel, "НАЙДЕННЫЕ ПРЕДМЕТЫ", 20, Pal.Gold, TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-340f, 82f), new Vector2(360f, 28f), art.Serif, true);
+        equipHint = TextAt(panel, "", 13, new Color(0.72f, 0.68f, 0.62f), TextAnchor.MiddleRight,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(340f, 82f), new Vector2(380f, 24f), art.Sans, true);
+
+        equipItemsRoot = MakeRect("Items", panel, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -108f), new Vector2(1020f, 364f));
+
+        MakeButton(panel, "ЗАКРЫТЬ", new Vector2(0f, -342f), new Vector2(220f, 46f),
+            HideEquipment, 21, false);
+
+        SetGroup(equipGroup, false);
+    }
+
+    public void ShowEquipment()
+    {
+        RefreshEquipment();
+        SetGroup(equipGroup, true);
+    }
+
+    public void HideEquipment()
+    {
+        SetGroup(equipGroup, false);
+    }
+
+    private void RefreshEquipment()
+    {
+        if (equipItemsRoot == null) return;
+        for (int i = 0; i < 3; i++)
+        {
+            var item = MetaProgress.Equipped((EquipSlot)i);
+            equipSlotIcons[i].sprite = item != null ? art.UI(item.Icon) : null;
+            equipSlotIcons[i].enabled = item != null;
+            equipSlotNames[i].text = item != null ? item.Name : "ПУСТО";
+            equipSlotNames[i].color = item != null ? Data.RarityColor(item.Rarity) : new Color(0.7f, 0.66f, 0.6f);
+            equipSlotStats[i].text = item != null
+                ? Data.RarityName(item.Rarity) + "\n" + item.StatLine()
+                : "Ничего не надето";
+        }
+
+        for (int i = equipItemsRoot.childCount - 1; i >= 0; i--)
+        {
+            Destroy(equipItemsRoot.GetChild(i).gameObject);
+        }
+
+        var items = MetaProgress.OwnedItems();
+        if (items.Count == 0)
+        {
+            TextAt(equipItemsRoot, "Пока пусто. Спустись в подземелье — снаряжение выпадает не всегда.",
+                18, new Color(0.72f, 0.68f, 0.62f), TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 80f), new Vector2(820f, 60f), art.Sans, true);
+        }
+        else
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                int col = i % 3;
+                int row = i / 3;
+                MakeItemCard(equipItemsRoot, new Vector2(-340f + col * 340f, 132f - row * 90f), items[i]);
+            }
+        }
+        if (equipHint != null)
+        {
+            equipHint.text = "СОБРАНО " + items.Count + " / " + Data.Equipment.Count;
+        }
+    }
+
+    private void MakeItemCard(Transform parent, Vector2 pos, EquipmentDef item)
+    {
+        bool equipped = MetaProgress.Equipped(item.Slot) != null &&
+                        MetaProgress.Equipped(item.Slot).Id == item.Id;
+        var rt = MakeRect("item_" + item.Id, parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), pos, new Vector2(330f, 78f));
+        var bg = rt.gameObject.AddComponent<Image>();
+        bg.sprite = art.UI("ui_card_dark", new Vector4(16f, 16f, 16f, 16f));
+        bg.type = Image.Type.Sliced;
+        bg.color = equipped ? new Color(0.82f, 1f, 0.86f, 1f) : new Color(1f, 1f, 1f, 0.92f);
+        bg.raycastTarget = true;
+
+        var accent = Img(rt, art.UI("white"), new Color(Data.RarityColor(item.Rarity).r,
+                Data.RarityColor(item.Rarity).g, Data.RarityColor(item.Rarity).b, 0.9f),
+            new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(2f, 0f),
+            new Vector2(4f, -12f), false);
+        accent.rectTransform.offsetMin = new Vector2(2f, 12f);
+        accent.rectTransform.offsetMax = new Vector2(6f, -12f);
+
+        var iconRt = MakeRect("icon", rt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(12f, 0f), new Vector2(52f, 52f));
+        var icon = iconRt.gameObject.AddComponent<Image>();
+        icon.sprite = art.UI(item.Icon);
+        icon.preserveAspect = true;
+        icon.raycastTarget = false;
+
+        TextAt(rt, item.Name, 14, Data.RarityColor(item.Rarity), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(74f, -8f),
+            new Vector2(240f, 20f), art.Serif, true);
+        TextAt(rt, Data.RarityName(item.Rarity) + " · " + Data.SlotName(item.Slot), 10,
+            new Color(0.72f, 0.68f, 0.62f), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(74f, -28f),
+            new Vector2(240f, 16f), art.Sans, true);
+        TextAt(rt, item.StatLine(), 10, new Color(0.82f, 0.78f, 0.7f), TextAnchor.UpperLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(74f, -44f),
+            new Vector2(244f, 30f), art.Sans, true);
+        if (equipped)
+        {
+            // equipped items are highlighted by the green frame tint above
+        }
+
+        var btn = rt.gameObject.AddComponent<Button>();
+        btn.targetGraphic = bg;
+        btn.transition = Selectable.Transition.None;
+        var nav = btn.navigation;
+        nav.mode = Navigation.Mode.None;
+        btn.navigation = nav;
+        btn.onClick.AddListener(() =>
+        {
+            MetaProgress.Equip(item);
+            RefreshEquipment();
+            if (Game.I.Audio != null) Game.I.Audio.Play("ui_click", 0.55f);
+        });
+        var fx = rt.gameObject.AddComponent<UIButtonFx>();
+        fx.Init(rt, bg, bg.sprite);
     }
 
     // ------------------------------------------------------------------ баннер и оверлеи

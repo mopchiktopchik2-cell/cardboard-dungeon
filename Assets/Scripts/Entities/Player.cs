@@ -40,6 +40,7 @@ public class Player : MonoBehaviour
     public float DashCd;
     public float DashCooldown = 1.35f;
     public bool Dead;
+    public bool QaInvincible;
     public bool Control = true;
     public float PoisonTimer;
     public float PoisonDps;
@@ -79,6 +80,16 @@ public class Player : MonoBehaviour
     public void ResetForRun()
     {
         Stats = new PlayerStats();
+        var hero = Data.Hero(MetaProgress.SelectedClass);
+        Stats.maxHp = hero.Hp;
+        Stats.speed = hero.Speed;
+        Stats.damage = hero.Damage;
+        Stats.attackInterval = hero.AttackInterval;
+        Stats.range = hero.Range;
+        Stats.critChance = hero.Crit;
+        Stats.damageReduction = hero.Armor;
+        Stats.skillPower = hero.SkillPower;
+        MetaProgress.ApplyLoadout(Stats);
         Stats.hp = Stats.maxHp;
         Shield = 0f;
         ShieldTimer = 0f;
@@ -93,15 +104,25 @@ public class Player : MonoBehaviour
         transform.rotation = Quaternion.identity;
         if (dashRoutine != null) StopCoroutine(dashRoutine);
         dashRoutine = null;
+        SetClassVisual(MetaProgress.SelectedClass);
         Visual.ResetVisual();
         Visual.SetScale(1f);
         Visual.SetTint(Color.white);
         if (Skills != null) Skills.ResetForRun();
     }
 
+    public void SetClassVisual(HeroClass id)
+    {
+        if (Visual == null || Game.I == null || Game.I.Art == null) return;
+        var hero = Data.Hero(id);
+        Visual.SetSprite(Game.I.Art.Actor(hero.Sprite));
+        Visual.SetTint(Color.white);
+    }
+
     public void ShowInMenu()
     {
         transform.position = new Vector3(3.9f, -1.45f, 0f);
+        SetClassVisual(MetaProgress.SelectedClass);
         Visual.ResetVisual();
         Visual.SetVisible(true);
         Visual.Walking = false;
@@ -242,10 +263,28 @@ public class Player : MonoBehaviour
 
     private void FireAt(Enemy target)
     {
-        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.75f;
-        Vector2 dir = ((Vector2)target.transform.position + Vector2.up * 0.5f - origin).normalized;
+        Vector2 dir = ((Vector2)target.transform.position + Vector2.up * 0.5f -
+                       ((Vector2)transform.position + Vector2.up * 0.75f)).normalized;
         facing = dir;
         Visual.Face(dir.x);
+        var hero = Data.Hero(MetaProgress.SelectedClass);
+        switch (hero.Style)
+        {
+            case HeroAttackStyle.Slash:
+                SlashAttack(dir);
+                break;
+            case HeroAttackStyle.Arrow:
+                FireArrow(dir);
+                break;
+            default:
+                FireBolt(dir);
+                break;
+        }
+    }
+
+    private void FireBolt(Vector2 dir)
+    {
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.75f;
         Visual.Attack(dir, 1f);
         Game.I.Fx.Sprite("fx_glow", origin, 0.42f, 0.13f,
             new Color(0.55f, 1f, 0.95f, 0.75f), 1660, 0f, 0f, 0f);
@@ -261,6 +300,52 @@ public class Player : MonoBehaviour
                 Stats.pierce, 0f, crit, Stats.freezeShot, Stats.poisonShot, false, 1.8f);
         }
         Game.I.Audio.Play("sfx_shoot", 0.45f, 1f, 0.08f);
+    }
+
+    private void FireArrow(Vector2 dir)
+    {
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.8f;
+        Visual.Attack(dir, 0.85f);
+        bool crit = Random.value < Stats.critChance;
+        float dmg = Stats.damage * RageMult * (crit ? Stats.critMult : 1f);
+        int count = Mathf.Max(1, Stats.multishot);
+        for (int i = 0; i < count; i++)
+        {
+            float spread = (i - (count - 1) * 0.5f) * 5f;
+            Vector2 d = Rotate(dir, spread);
+            Projectile.Player(origin, d, dmg, 23f, "proj_arrow", new Color(0.72f, 1f, 0.62f), 1.25f,
+                Stats.pierce + 1, 0f, crit, Stats.freezeShot, Stats.poisonShot, false, 2.1f);
+        }
+        Game.I.Fx.Sprite("fx_glow", origin, 0.28f, 0.1f,
+            new Color(0.65f, 1f, 0.5f, 0.55f), 1660, 0f, 0f, 0f);
+        Game.I.Audio.Play("sfx_shoot", 0.4f, 1.18f, 0.06f);
+    }
+
+    private void SlashAttack(Vector2 dir)
+    {
+        Visual.Attack(dir, 1.2f);
+        Game.I.Fx.Slash((Vector2)transform.position + dir * 0.85f + Vector2.up * 0.55f, dir);
+        Game.I.Fx.Ring((Vector2)transform.position + Vector2.up * 0.5f,
+            new Color(1f, 0.86f, 0.55f, 0.38f), Stats.range, 0.22f);
+        Game.I.Audio.Play("sfx_shoot", 0.32f, 0.72f, 0.05f);
+
+        bool any = false;
+        var list = Game.I.Rooms.EnemiesInRadius(transform.position, Stats.range + 0.55f);
+        foreach (var e in list)
+        {
+            if (e == null || e.Dead) continue;
+            Vector2 to = ((Vector2)e.transform.position - (Vector2)transform.position).normalized;
+            if (Vector2.Dot(dir, to) < 0.12f) continue;
+            bool crit = Random.value < Stats.critChance;
+            float dmg = Stats.damage * RageMult * (crit ? Stats.critMult : 1f);
+            e.TakeDamage(dmg, transform.position, true, crit);
+            any = true;
+        }
+        if (any)
+        {
+            Game.I.Shake(0.045f, 0.08f);
+            Game.I.Hitstop(0.012f);
+        }
     }
 
     private IEnumerator Dash(Vector2 dir)
@@ -285,6 +370,7 @@ public class Player : MonoBehaviour
         Enemy attacker = null)
     {
         if (Dead) return;
+        if (QaInvincible) return;
         if (!ignoreInvuln && Invuln > 0f) return;
         amount *= 1f - Mathf.Clamp(Stats.damageReduction, 0f, 0.7f);
 

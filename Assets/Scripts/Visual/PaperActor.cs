@@ -112,6 +112,20 @@ public class PaperActor : MonoBehaviour
         baseScale = Vector3.one * scale;
     }
 
+    public void SetSprite(Sprite sprite)
+    {
+        if (sprite == null || Main == null) return;
+        Main.sprite = sprite;
+        if (Shadow != null)
+        {
+            float sw = Main.sprite.bounds.size.x;
+            float shW = Shadow.sprite.bounds.size.x;
+            float k = sw * 0.72f / Mathf.Max(0.01f, shW);
+            shadowBaseScale = new Vector3(k, k * 0.95f, 1f);
+            Shadow.transform.localScale = shadowBaseScale * spawnScale;
+        }
+    }
+
     public void SetTint(Color color)
     {
         baseColor = color;

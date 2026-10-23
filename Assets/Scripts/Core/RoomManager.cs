@@ -16,6 +16,8 @@ public class RoomManager : MonoBehaviour
     public List<Enemy> Enemies = new List<Enemy>();
     public List<Obstacle> Obstacles = new List<Obstacle>();
     public RoomDef CurrentRoom;
+    public DungeonDef CurrentDungeon;
+    public RoomTheme CurrentTheme;
     public Transform Root;
     public int WaveIndex;
     public bool WaveSpawning;
@@ -36,59 +38,42 @@ public class RoomManager : MonoBehaviour
     {
         ClearRoom();
         CurrentRoom = null;
+        CurrentDungeon = MetaProgress.SelectedDungeon;
+        CurrentTheme = Data.Theme(CurrentDungeon.Rooms[0].Theme);
         BossDead = false;
         Cleared = true;
-        BuildBase(-1, false);
+        BuildBase(-1, false, CurrentTheme);
         AddCampfire(new Vector2(2.1f, -1.35f));
         AddProp("prop_rock", new Vector2(-3.6f, -2.4f), 1.1f, 0.4f);
         AddProp("prop_bones", new Vector2(4.6f, 1.4f), 1.0f, 0f);
         AddProp("prop_column", new Vector2(-5.3f, 2.6f), 1.0f, 0.45f);
-        AddTorches();
+        AddThemeDecor(-1, false, false);
+        AddTorches(CurrentTheme);
+    }
+
+    public void RebuildMenuForSelection()
+    {
+        if (Game.I == null || Game.I.State != GameState.Menu) return;
+        BuildMenu();
+        if (Game.I.Player != null) Game.I.Player.ShowInMenu();
     }
 
     public void BuildRoom(int index, bool firstRoom)
     {
         ClearRoom();
-        CurrentRoom = Data.Rooms[index];
+        CurrentDungeon = Game.I.Run.Dungeon ?? MetaProgress.SelectedDungeon;
+        if (CurrentDungeon == null) CurrentDungeon = Data.Dungeons[0];
+        index = Mathf.Clamp(index, 0, CurrentDungeon.Rooms.Length - 1);
+        CurrentRoom = CurrentDungeon.Rooms[index];
+        CurrentTheme = Data.Theme(CurrentRoom.Theme);
         BossDead = false;
         Cleared = false;
         WaveIndex = 0;
         bool boss = CurrentRoom.Type == RoomType.Boss;
-        BuildBase(index, boss);
-        AddTorches();
+        BuildBase(index, boss, CurrentTheme);
+        AddTorches(CurrentTheme);
         AddDoor();
-        var rng = new System.Random(index * 97 + 11);
-        if (boss)
-        {
-            AddProp("prop_column", new Vector2(-5.9f, 2.6f), 1.25f, 0.5f);
-            AddProp("prop_column", new Vector2(5.9f, 2.6f), 1.25f, 0.5f);
-            AddProp("prop_column", new Vector2(-5.9f, -2.7f), 1.25f, 0.5f);
-            AddProp("prop_column", new Vector2(5.9f, -2.7f), 1.25f, 0.5f);
-            AddProp("prop_bones", new Vector2(-2.5f, -2.9f), 1.1f, 0f);
-            AddProp("prop_bones", new Vector2(2.8f, 2.7f), 0.9f, 0f);
-        }
-        else
-        {
-            Vector2[] spots =
-            {
-                new Vector2(-5.7f, 2.6f), new Vector2(5.4f, 2.5f),
-                new Vector2(-4.8f, -2.8f), new Vector2(5.2f, -2.7f),
-                new Vector2(-1.8f, 3.0f), new Vector2(1.4f, -3.1f)
-            };
-            int count = 2 + rng.Next(0, 3);
-            var used = new List<int>();
-            for (int i = 0; i < count; i++)
-            {
-                int si = rng.Next(0, spots.Length);
-                if (used.Contains(si)) continue;
-                used.Add(si);
-                string[] props = { "prop_column", "prop_rock", "prop_barrel", "prop_bones" };
-                string name = props[rng.Next(0, props.Length)];
-                float scale = 0.85f + (float)rng.NextDouble() * 0.3f;
-                float obstacle = name == "prop_bones" ? 0f : (name == "prop_column" ? 0.45f : 0.35f);
-                AddProp(name, spots[si], scale, obstacle);
-            }
-        }
+        AddThemeDecor(index, boss, true);
 
         if (CurrentRoom.Type == RoomType.Treasure)
         {
@@ -100,9 +85,11 @@ public class RoomManager : MonoBehaviour
         }
     }
 
-    private void BuildBase(int index, bool boss)
+    private void BuildBase(int index, bool boss, RoomTheme theme)
     {
         var art = Game.I.Art;
+        var dungeon = CurrentDungeon ?? MetaProgress.SelectedDungeon;
+        if (theme == null) theme = Data.Theme("crypt_cellar");
         var rootGo = new GameObject("Room");
         Root = rootGo.transform;
 
@@ -110,75 +97,81 @@ public class RoomManager : MonoBehaviour
         table.transform.SetParent(Root, false);
         var tableSr = table.AddComponent<SpriteRenderer>();
         tableSr.sprite = art.World("table_bg");
-        tableSr.color = new Color(0.72f, 0.69f, 0.80f, 1f);
+        tableSr.color = Color.Lerp(new Color(0.62f, 0.58f, 0.72f, 1f), theme.FloorTint, 0.35f);
         tableSr.sortingOrder = -3000;
         tableSr.drawMode = SpriteDrawMode.Simple;
         float tw = tableSr.sprite.bounds.size.x;
         float th = tableSr.sprite.bounds.size.y;
         table.transform.localScale = new Vector3(31f / tw, 17.5f / th, 1f);
 
-        string floorName = boss ? "floor_boss" : "floor";
+        string floorName = index % 2 == 0 ? dungeon.FloorA : dungeon.FloorB;
+        if (theme != null && !string.IsNullOrEmpty(theme.Floor)) floorName = theme.Floor;
         var floorSr = AddTile(floorName, Vector3.zero, new Vector2(17.9f, 9.1f), -2000);
-        floorSr.color = boss ? new Color(0.68f, 0.60f, 0.75f, 1f) : new Color(0.78f, 0.82f, 0.98f, 1f);
-        AddQuad(new Vector3(0f, 0f, 0f), new Vector2(17.9f, 9.1f),
-            boss ? new Color(0.10f, 0.04f, 0.12f, 0.14f) : new Color(0.035f, 0.07f, 0.16f, 0.12f), -1995, 0f);
+        floorSr.color = theme.FloorTint;
+        AddQuad(new Vector3(0f, 0f, 0f), new Vector2(17.9f, 9.1f), A(theme.FogA, 0.12f), -1995, 0f);
+        AddQuad(new Vector3(0f, 2.9f, 0f), new Vector2(17.9f, 3.4f), A(theme.Torch, 0.035f), -1994, 0f);
 
         // Cold gloom pooling at the edges of the arena.
-        AddQuad(new Vector3(0f, 3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.28f), -1988, 0f);
-        AddQuad(new Vector3(0f, -3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.25f), -1988, 0f);
+        AddQuad(new Vector3(0f, 3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.34f), -1988, 0f);
+        AddQuad(new Vector3(0f, -3.9f, 0f), new Vector2(18.4f, 1.35f), new Color(0.01f, 0.02f, 0.05f, 0.31f), -1988, 0f);
 
         // тёмная кромка листа картона
-        AddQuad(new Vector3(0f, -4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.55f), -1990, 0f);
-        AddQuad(new Vector3(0f, 4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.45f), -1990, 0f);
+        AddQuad(new Vector3(0f, -4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.6f), -1990, 0f);
+        AddQuad(new Vector3(0f, 4.62f, 0f), new Vector2(18.4f, 0.18f), new Color(0.08f, 0.05f, 0.06f, 0.5f), -1990, 0f);
 
-        var wallTop = AddTile("wall_h", new Vector3(0f, 5.05f, 0f), new Vector2(19.6f, 1.25f), -1500);
-        var wallBottom = AddTile("wall_h", new Vector3(0f, -5.05f, 0f), new Vector2(19.6f, 1.25f), -1490);
-        var wallLeft = AddTile("wall_v", new Vector3(-9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1480);
-        var wallRight = AddTile("wall_v", new Vector3(9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1470);
-        Color wallTint = new Color(0.62f, 0.60f, 0.70f, 1f);
+        string wallName = !string.IsNullOrEmpty(theme.Wall) ? theme.Wall : "wall_h";
+        var wallTop = AddTile(wallName, new Vector3(0f, 5.05f, 0f), new Vector2(19.6f, 1.25f), -1500);
+        var wallBottom = AddTile(wallName, new Vector3(0f, -5.05f, 0f), new Vector2(19.6f, 1.25f), -1490);
+        var wallLeft = AddTile(wallName, new Vector3(-9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1480, 90f);
+        var wallRight = AddTile(wallName, new Vector3(9.3f, 0f, 0f), new Vector2(1.25f, 10.4f), -1470, -90f);
+        Color wallTint = theme.WallTint;
         wallTop.color = wallTint;
         wallBottom.color = wallTint;
         wallLeft.color = wallTint;
         wallRight.color = wallTint;
 
         // бумажный мусор
-        var rng = new System.Random(index * 13 + 71);
-        for (int i = 0; i < 12; i++)
+        var rng = new System.Random(index * 13 + 71 + (dungeon.Id.GetHashCode() & 0xFF));
+        for (int i = 0; i < 14; i++)
         {
             var p = new Vector3((float)rng.NextDouble() * 16f - 8f, (float)rng.NextDouble() * 8f - 4f, 0f);
             if (Mathf.Abs(p.x) < 2f && Mathf.Abs(p.y) < 1.6f) continue;
             var q = AddQuad(p, new Vector2(0.35f + (float)rng.NextDouble() * 0.7f,
-                0.2f + (float)rng.NextDouble() * 0.4f), new Color(0.9f, 0.82f, 0.65f, 0.12f), -1950,
+                0.2f + (float)rng.NextDouble() * 0.4f), A(theme.Motes, 0.14f), -1950,
                 (float)rng.NextDouble() * 180f);
             q.transform.localScale = new Vector3(q.transform.localScale.x, q.transform.localScale.y, 1f);
         }
 
-        AddFog(new Vector3(-3.8f, 1.2f, 0f), 7.5f, new Color(0.30f, 0.40f, 0.62f, 0.075f), 0.17f);
-        AddFog(new Vector3(3.4f, -1.6f, 0f), 6.2f, new Color(0.38f, 0.28f, 0.52f, 0.06f), 0.11f);
-        AddFog(new Vector3(0.4f, 3.2f, 0f), 5.2f, new Color(0.18f, 0.30f, 0.46f, 0.055f), 0.08f);
-        for (int i = 0; i < 22; i++)
+        AddFog(new Vector3(-3.8f, 1.2f, 0f), 7.5f, A(theme.FogA, 0.08f), 0.17f);
+        AddFog(new Vector3(3.4f, -1.6f, 0f), 6.2f, A(theme.FogB, 0.065f), 0.11f);
+        AddFog(new Vector3(0.4f, 3.2f, 0f), 5.2f, A(theme.FogA, 0.05f), 0.08f);
+        for (int i = 0; i < 26; i++)
         {
             var mote = new GameObject("mote");
             mote.transform.SetParent(Root, false);
             mote.transform.position = new Vector3(Random.Range(-8.2f, 8.2f), Random.Range(-4.2f, 4.2f), 0f);
             var msr = mote.AddComponent<SpriteRenderer>();
             msr.sprite = art.World("fx_mote");
-            msr.color = i % 3 == 0
-                ? new Color(0.95f, 0.66f, 0.35f, 0.35f)
-                : new Color(0.6f, 0.72f, 0.95f, 0.24f);
+            msr.color = i % 3 == 0 ? A(theme.Torch, 0.38f) : A(theme.Motes, 0.24f);
             msr.sortingOrder = -450;
-            float s = Random.Range(0.05f, 0.16f);
+            float s = Random.Range(0.05f, 0.17f);
             mote.transform.localScale = new Vector3(s, s, 1f);
             var drift = mote.AddComponent<MoteDrift>();
             drift.Init(Random.Range(0.15f, 0.55f), Random.Range(0.1f, 0.5f), Random.Range(0f, 6.28f));
         }
     }
 
-    private SpriteRenderer AddTile(string sprite, Vector3 pos, Vector2 size, int order)
+    private static Color A(Color c, float alpha)
+    {
+        return new Color(c.r, c.g, c.b, alpha);
+    }
+
+    private SpriteRenderer AddTile(string sprite, Vector3 pos, Vector2 size, int order, float rotation = 0f)
     {
         var go = new GameObject("tile_" + sprite);
         go.transform.SetParent(Root, false);
         go.transform.position = pos;
+        go.transform.rotation = Quaternion.Euler(0f, 0f, rotation);
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = Game.I.Art.Tiled(sprite);
         sr.drawMode = SpriteDrawMode.Tiled;
@@ -215,8 +208,9 @@ public class RoomManager : MonoBehaviour
         go.AddComponent<FogDrift>().Init(sr, pos, size, color, speed);
     }
 
-    private void AddTorches()
+    private void AddTorches(RoomTheme theme)
     {
+        Color flameColor = theme != null ? theme.Torch : new Color(1f, 0.72f, 0.38f);
         float[] xs = { -6.4f, -3.2f, 0f, 3.2f, 6.4f };
         foreach (float x in xs)
         {
@@ -234,7 +228,7 @@ public class RoomManager : MonoBehaviour
             flameGo.transform.localPosition = new Vector3(0f, 0.83f, 0f);
             var fr = flameGo.AddComponent<SpriteRenderer>();
             fr.sprite = Game.I.Art.World("fx_flame");
-            fr.color = new Color(1f, 0.72f, 0.38f, 0.95f);
+            fr.color = A(flameColor, 0.95f);
             fr.sortingOrder = 625;
             flameGo.transform.localScale = Vector3.one * 0.65f;
 
@@ -243,13 +237,138 @@ public class RoomManager : MonoBehaviour
             glowGo.transform.localPosition = new Vector3(0f, 0.85f, 0.1f);
             var gr = glowGo.AddComponent<SpriteRenderer>();
             gr.sprite = Game.I.Art.World("fx_glow");
-            gr.color = new Color(1f, 0.55f, 0.2f, 0.22f);
+            gr.color = A(flameColor, 0.22f);
             gr.sortingOrder = 610;
             glowGo.transform.localScale = Vector3.one * 1.6f;
 
             var flicker = flameGo.AddComponent<TorchFlicker>();
-            flicker.Init(fr, gr);
+            flicker.Init(fr, gr, flameColor);
         }
+    }
+
+    private void AddThemeDecor(int index, bool boss, bool allowCenterpiece)
+    {
+        var theme = CurrentTheme ?? Data.Theme("crypt_cellar");
+        var rng = new System.Random(index * 97 + 11 + (CurrentDungeon != null ? CurrentDungeon.Id.GetHashCode() & 0xFF : 0));
+        bool skipCenter = !allowCenterpiece || CurrentRoom == null ||
+                          CurrentRoom.Type == RoomType.Treasure || CurrentRoom.Type == RoomType.Rest;
+        if (!skipCenter && !string.IsNullOrEmpty(theme.Centerpiece))
+        {
+            Vector2 centerPos = boss ? new Vector2(0f, 2.35f) : new Vector2(0f, 0.25f);
+            float centerScale = boss ? 1.45f : 1.08f;
+            float radius = CenterpieceRadius(theme.Centerpiece);
+            if (boss) centerScale *= 1.12f;
+            AddProp(theme.Centerpiece, centerPos, centerScale, radius);
+            AddDecal(theme.Centerpiece, centerPos + Vector2.up * -0.15f, centerScale * 0.9f, A(theme.Torch, 0.12f), -1850);
+        }
+
+        if (boss)
+        {
+            AddProp("prop_column", new Vector2(-5.9f, 2.6f), 1.25f, 0.5f);
+            AddProp("prop_column", new Vector2(5.9f, 2.6f), 1.25f, 0.5f);
+            AddProp("prop_column", new Vector2(-5.9f, -2.7f), 1.25f, 0.5f);
+            AddProp("prop_column", new Vector2(5.9f, -2.7f), 1.25f, 0.5f);
+        }
+
+        Vector2[] spots =
+        {
+            new Vector2(-6.7f, 3.0f), new Vector2(6.5f, 2.9f),
+            new Vector2(-6.4f, -2.8f), new Vector2(6.6f, -2.7f),
+            new Vector2(-2.4f, 3.3f), new Vector2(2.4f, -3.3f),
+            new Vector2(-0.7f, 3.5f), new Vector2(0.9f, -3.5f)
+        };
+        var used = new List<int>();
+        int count = Mathf.Clamp(theme.PropCount + (boss ? -1 : 0), 2, spots.Length);
+        for (int i = 0; i < count && theme.Props.Length > 0; i++)
+        {
+            int si = rng.Next(0, spots.Length);
+            if (used.Contains(si)) continue;
+            used.Add(si);
+            string name = theme.Props[i % theme.Props.Length];
+            float scale = 0.85f + (float)rng.NextDouble() * 0.35f;
+            float obstacle = PropRadius(name);
+            AddProp(name, spots[si], scale, obstacle);
+        }
+
+        // Пара плоских пятен на полу: мох, кровь, кислотная лужа или паутина.
+        string decal = null;
+        if (theme.Props != null)
+        {
+            foreach (var p in theme.Props)
+            {
+                if (p == "prop_moss" || p == "prop_blood" || p == "prop_acid" || p == "prop_web")
+                {
+                    decal = p;
+                    break;
+                }
+            }
+        }
+        if (!string.IsNullOrEmpty(decal))
+        {
+            AddDecal(decal, new Vector2(-3.4f + (float)rng.NextDouble() * 1.5f, -2.2f), 1.7f,
+                new Color(1f, 1f, 1f, 0.72f), -1840);
+            AddDecal(decal, new Vector2(2.8f + (float)rng.NextDouble() * 1.7f, 1.8f), 1.45f,
+                new Color(1f, 1f, 1f, 0.6f), -1840);
+        }
+    }
+
+    private static float CenterpieceRadius(string name)
+    {
+        switch (name)
+        {
+            case "prop_web":
+            case "prop_moss":
+            case "prop_blood":
+            case "prop_acid":
+                return 0f;
+            case "prop_altar":
+            case "prop_sarcophagus":
+            case "prop_cauldron":
+            case "prop_eggs":
+                return 0.48f;
+            case "prop_throne":
+            case "prop_web_throne":
+            case "prop_bone_arch":
+            case "prop_gate":
+                return 0.7f;
+            default:
+                return 0.4f;
+        }
+    }
+
+    private static float PropRadius(string name)
+    {
+        switch (name)
+        {
+            case "prop_bones":
+            case "prop_skullpile":
+            case "prop_moss":
+            case "prop_web":
+            case "prop_blood":
+            case "prop_acid":
+            case "prop_roots":
+                return 0f;
+            case "prop_column":
+            case "prop_bone_arch":
+            case "prop_gate":
+            case "prop_throne":
+            case "prop_web_throne":
+                return 0.45f;
+            default:
+                return 0.3f;
+        }
+    }
+
+    private void AddDecal(string name, Vector2 pos, float scale, Color tint, int order)
+    {
+        var go = new GameObject("decal_" + name);
+        go.transform.SetParent(Root, false);
+        go.transform.position = new Vector3(pos.x, pos.y, 0f);
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = Game.I.Art.Prop(name);
+        sr.color = tint;
+        sr.sortingOrder = order;
+        go.transform.localScale = new Vector3(scale, scale, 1f);
     }
 
     private void AddDoor()
@@ -323,7 +442,9 @@ public class RoomManager : MonoBehaviour
             if (WaveIndex == 0)
             {
                 WaveIndex = 1;
-                SpawnOne(EnemyKind.Lich, false, new Vector2(3.2f, 0f));
+                var dungeon = CurrentDungeon ?? Game.I.Run.Dungeon;
+                var bossKind = dungeon != null ? dungeon.BossKind : EnemyKind.Lich;
+                SpawnOne(bossKind, false, new Vector2(3.2f, 0f));
             }
             return;
         }
@@ -360,17 +481,25 @@ public class RoomManager : MonoBehaviour
     {
         var e = Enemy.Spawn(kind, pos, Game.I.Run.EnemyHpScale, Game.I.Run.EnemyDamageScale, elite);
         Enemies.Add(e);
-        if (kind == EnemyKind.Lich)
+        if (e.Boss)
         {
-            Game.I.UI.ShowBossBar(true);
+            Game.I.UI.ShowBossBar(true, e.Def.Name);
         }
     }
 
     public void SpawnAdds(int count)
     {
+        var dungeon = CurrentDungeon ?? Game.I.Run.Dungeon;
+        EnemyKind[] adds = dungeon != null && dungeon.Adds != null && dungeon.Adds.Length > 0
+            ? dungeon.Adds
+            : new[] { EnemyKind.Imp, EnemyKind.Skeleton };
+        if (dungeon != null && dungeon.BossKind == EnemyKind.SpiderQueen)
+        {
+            adds = new[] { EnemyKind.Spider };
+        }
         for (int i = 0; i < count; i++)
         {
-            EnemyKind kind = i % 2 == 0 ? EnemyKind.Imp : EnemyKind.Skeleton;
+            EnemyKind kind = adds[i % adds.Length];
             Vector2 pos = new Vector2(3.2f + Random.Range(-2.5f, 2.5f), Random.Range(-2.5f, 2.5f));
             SpawnOne(kind, false, Clamp(pos, 0.6f));
         }
@@ -379,51 +508,25 @@ public class RoomManager : MonoBehaviour
     private List<EnemyKind> Composition(int room, int wave)
     {
         var list = new List<EnemyKind>();
-        switch (room)
+        var dungeon = CurrentDungeon ?? Game.I.Run.Dungeon;
+        EnemyKind[] pool = dungeon != null && dungeon.Pool != null && dungeon.Pool.Length > 0
+            ? dungeon.Pool
+            : new[] { EnemyKind.Imp, EnemyKind.Skeleton, EnemyKind.Spider, EnemyKind.Boar };
+        int difficulty = dungeon != null ? (int)dungeon.Difficulty : 0;
+        int count = 2 + wave + difficulty;
+        if (room > 7) count++;
+        if (CurrentRoom != null && CurrentRoom.Type == RoomType.Elite) count++;
+        count = Mathf.Clamp(count, 2, 8);
+        var rng = new System.Random((room + 1) * 977 + wave * 131 + (dungeon != null ? dungeon.Id.GetHashCode() : 0));
+        for (int i = 0; i < count; i++)
         {
-            case 0:
-                if (wave == 0) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); }
-                else { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
-                break;
-            case 1:
-                if (wave == 0) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Imp); }
-                break;
-            case 2:
-                list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider);
-                break;
-            case 3:
-                if (wave == 0) { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
-                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Skeleton); }
-                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
-                break;
-            case 5:
-                list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider);
-                list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Imp);
-                break;
-            case 6:
-                if (wave == 0) { list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Skeleton); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); }
-                break;
-            case 8:
-                if (wave == 0) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); }
-                else if (wave == 1) { list.Add(EnemyKind.Imp); list.Add(EnemyKind.Imp); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Spider); }
-                else { list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Boar); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Bomber); }
-                break;
-            case 9:
-                if (wave == 0) { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Spider); }
-                else if (wave == 1) { list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Spider); list.Add(EnemyKind.Imp); }
-                else { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Guard); list.Add(EnemyKind.Shaman); }
-                break;
-            case 10:
-                if (wave == 0) { list.Add(EnemyKind.Boar); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Bomber); list.Add(EnemyKind.Guard); }
-                else { list.Add(EnemyKind.Guard); list.Add(EnemyKind.Shaman); list.Add(EnemyKind.Skeleton); list.Add(EnemyKind.Spider); }
-                break;
-            default:
-                int count = 3 + wave;
-                EnemyKind[] pool = { EnemyKind.Imp, EnemyKind.Skeleton, EnemyKind.Spider, EnemyKind.Boar };
-                for (int i = 0; i < count; i++) list.Add(pool[Random.Range(0, pool.Length)]);
-                break;
+            int pick = rng.Next(0, pool.Length);
+            list.Add(pool[pick]);
+        }
+        // Хотя бы один дальний или тяжёлый враг в поздних волнах.
+        if (wave > 0 && pool.Length > 1)
+        {
+            list[list.Count - 1] = pool[(room + wave) % pool.Length];
         }
         return list;
     }
@@ -639,7 +742,7 @@ public class RoomManager : MonoBehaviour
         var copy = new List<Enemy>(Enemies);
         foreach (var e in copy)
         {
-            if (e != null && !e.Dead) e.TakeDamage(99999f, e.transform.position, true, false);
+            if (e != null && !e.Dead) e.TakeDamage(Mathf.Max(1f, e.Hp * 2f), e.transform.position, true, false);
         }
     }
 
@@ -675,11 +778,18 @@ public class TorchFlicker : MonoBehaviour
     private SpriteRenderer flame;
     private SpriteRenderer glow;
     private float seed;
+    private Color baseColor = new Color(1f, 0.72f, 0.38f);
 
     public void Init(SpriteRenderer f, SpriteRenderer g)
     {
+        Init(f, g, new Color(1f, 0.72f, 0.38f));
+    }
+
+    public void Init(SpriteRenderer f, SpriteRenderer g, Color color)
+    {
         flame = f;
         glow = g;
+        baseColor = color;
         seed = Random.value * 10f;
     }
 
@@ -690,12 +800,12 @@ public class TorchFlicker : MonoBehaviour
         if (flame != null)
         {
             flame.transform.localScale = Vector3.one * (0.58f + n * 0.18f);
-            flame.color = new Color(1f, 0.66f + n2 * 0.16f, 0.32f, 0.9f);
+            flame.color = new Color(baseColor.r, baseColor.g * (0.82f + n2 * 0.18f), baseColor.b, 0.9f);
             flame.transform.localRotation = Quaternion.Euler(0f, 0f, (n - 0.5f) * 5f);
         }
         if (glow != null)
         {
-            glow.color = new Color(1f, 0.52f, 0.2f, 0.16f + n * 0.1f);
+            glow.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0.16f + n * 0.1f);
         }
     }
 }

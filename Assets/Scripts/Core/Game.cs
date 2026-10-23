@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using UnityEngine;
 
 public enum GameState
@@ -84,6 +85,8 @@ public class Game : MonoBehaviour
 
         Debug.Log("[Cardboard] Boot complete");
         ToMenu();
+        if (QA && HasArg("-qaEquip")) StartCoroutine(QaEquipShot());
+        else if (QA && HasArg("-qaTour")) StartCoroutine(QaTour());
     }
 
     private static bool HasArg(string arg)
@@ -95,6 +98,150 @@ public class Game : MonoBehaviour
         return false;
     }
 
+    private static string ArgValue(string prefix, string fallback)
+    {
+        foreach (var a in System.Environment.GetCommandLineArgs())
+        {
+            if (a.StartsWith(prefix)) return a.Substring(prefix.Length);
+        }
+        return fallback;
+    }
+
+    private IEnumerator QaTour()
+    {
+        string dungeonId = ArgValue("-qaDungeon=", "crypt");
+        string classArg = ArgValue("-qaClass=", "mage");
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+
+        int dungeonIndex = Data.Dungeons.FindIndex(d => d.Id == dungeonId);
+        if (dungeonIndex < 0) dungeonIndex = 0;
+        dungeonId = Data.Dungeons[dungeonIndex].Id;
+        MetaProgress.SelectedDungeonId = dungeonId;
+        UI.SelectDungeon(dungeonIndex);
+
+        HeroClass hero = HeroClass.Mage;
+        if (classArg == "swordsman") hero = HeroClass.Swordsman;
+        else if (classArg == "ranger") hero = HeroClass.Ranger;
+        MetaProgress.SelectedClass = hero;
+        UI.SelectClass(hero);
+
+        yield return new WaitForSecondsRealtime(1.0f);
+        yield return QaShot(shotsDir, "menu_" + dungeonId);
+
+        Player.QaInvincible = true;
+        StartRun();
+        for (int i = 0; i < Run.RoomCount; i++)
+        {
+            float wait = 12f;
+            while (wait > 0f && (Run.RoomIndex != i ||
+                   (State != GameState.Combat && State != GameState.Perk &&
+                    State != GameState.Victory && State != GameState.Dead)))
+            {
+                wait -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            Player.Heal(9999f);
+            var room = Run.Dungeon.Rooms[i];
+            float shotDelay = room.Type == RoomType.Boss ? 3.2f : 1.2f;
+            yield return new WaitForSecondsRealtime(shotDelay);
+            Player.Heal(9999f);
+            yield return QaShot(shotsDir, "room_" + (i + 1).ToString("00") + "_" + room.Theme);
+            if (State == GameState.Dead)
+            {
+                yield return new WaitForSecondsRealtime(1.5f);
+                yield return QaShot(shotsDir, "defeat_" + dungeonId);
+                break;
+            }
+
+            float killTimer = 20f;
+            while (State == GameState.Combat && killTimer > 0f)
+            {
+                Rooms.KillAllEnemies();
+                Player.Heal(9999f);
+                killTimer -= 0.2f;
+                yield return new WaitForSecondsRealtime(0.2f);
+            }
+
+            wait = 8f;
+            while (wait > 0f && State != GameState.Perk && State != GameState.Victory && State != GameState.Dead)
+            {
+                wait -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (State == GameState.Dead)
+            {
+                yield return new WaitForSecondsRealtime(1.5f);
+                yield return QaShot(shotsDir, "defeat_" + dungeonId);
+                break;
+            }
+            if (State == GameState.Perk)
+            {
+                yield return new WaitForSecondsRealtime(0.5f);
+                AdvanceQaChoice();
+                yield return new WaitForSecondsRealtime(0.3f);
+                if (State == GameState.Perk) AdvanceQaChoice();
+            }
+
+            wait = 12f;
+            while (wait > 0f && State != GameState.Victory && State != GameState.Dead && Run.RoomIndex == i)
+            {
+                wait -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (State == GameState.Victory || State == GameState.Dead) break;
+        }
+
+        yield return new WaitForSecondsRealtime(3.0f);
+        yield return QaShot(shotsDir, "victory_" + dungeonId);
+        yield return new WaitForSecondsRealtime(0.5f);
+        Application.Quit();
+    }
+
+    private void AdvanceQaChoice()
+    {
+        if (UI == null) return;
+        if (UI.RestScreenOpen)
+        {
+            ChooseRest(true);
+            return;
+        }
+        if (UI.SkillScreenOpen && UI.CurrentSkills.Count > 0)
+        {
+            ChooseSkill(UI.CurrentSkills[0].Id);
+            return;
+        }
+        if (UI.CurrentPerks.Count > 0) ChoosePerk(0);
+    }
+
+    private IEnumerator QaShot(string dir, string name)
+    {
+        string path = Path.Combine(dir, name + ".png");
+        ScreenCapture.CaptureScreenshot(path);
+        yield return new WaitForSecondsRealtime(0.8f);
+    }
+
+    private IEnumerator QaEquipShot()
+    {
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+        string[] items =
+        {
+            "grave_cleaver", "web_carapace", "crown_of_ashes",
+            "kingsbane", "royal_shroud", "lich_seal"
+        };
+        foreach (var id in items) MetaProgress.AddItem(id);
+        MetaProgress.Equip(Data.Item("kingsbane"));
+        MetaProgress.Equip(Data.Item("royal_shroud"));
+        MetaProgress.Equip(Data.Item("lich_seal"));
+        yield return new WaitForSecondsRealtime(0.8f);
+        UI.ShowEquipment();
+        yield return new WaitForSecondsRealtime(1.0f);
+        yield return QaShot(shotsDir, "equipment");
+        yield return new WaitForSecondsRealtime(0.5f);
+        Application.Quit();
+    }
+
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -103,7 +250,7 @@ public class Game : MonoBehaviour
             else if (State == GameState.Pause) ResumeGame();
         }
 
-        if (State == GameState.Menu && !UI.HelpOpen &&
+        if (State == GameState.Menu && !UI.MenuOverlayOpen &&
             (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
         {
             StartRun();
@@ -136,6 +283,22 @@ public class Game : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.F5))
             {
                 ScreenCapture.CaptureScreenshot("screenshot_" + Time.frameCount + ".png");
+            }
+            if (State == GameState.Menu && Input.GetKeyDown(KeyCode.F6))
+            {
+                int next = (Data.Dungeons.IndexOf(MetaProgress.SelectedDungeon) + 1) % Data.Dungeons.Count;
+                MetaProgress.SelectedDungeonId = Data.Dungeons[next].Id;
+                UI.SelectDungeon(next);
+            }
+            if (State == GameState.Menu && Input.GetKeyDown(KeyCode.F7))
+            {
+                int next = ((int)MetaProgress.SelectedClass + 1) % 3;
+                UI.SelectClass((HeroClass)next);
+            }
+            if (State == GameState.Combat && Input.GetKeyDown(KeyCode.F8))
+            {
+                Run.RoomIndex = Run.RoomCount - 1;
+                Rooms.KillAllEnemies();
             }
         }
     }
@@ -187,14 +350,15 @@ public class Game : MonoBehaviour
         SkipRequested = false;
         Run.RoomIndex = index;
         Rooms.BuildRoom(index, firstRoom);
-        Debug.Log("[Cardboard] Enter room " + (index + 1) + " / " + Data.RoomCount + " type=" + Data.Rooms[index].Type);
+        var rooms = Run.Dungeon.Rooms;
+        Debug.Log("[Cardboard] Enter room " + (index + 1) + " / " + Run.RoomCount + " type=" + rooms[index].Type);
         Player.RevivePosition(Rooms.PlayerSpawn);
         Player.SetVisible(true);
         Player.OnRoomStart();
         UI.RefreshRoom();
-        var room = Data.Rooms[index];
+        var room = rooms[index];
         UI.ShowBanner(room.Name, room.Subtitle, 1.8f, Data.RoomAccent(room.Type));
-        if (index == Data.RoomCount - 1)
+        if (index == Run.RoomCount - 1)
         {
             Audio.Music("music_boss", 1.2f);
         }
@@ -212,9 +376,9 @@ public class Game : MonoBehaviour
             yield break;
         }
         Rooms.SpawnWave();
-        if (index == Data.RoomCount - 1)
+        if (index == Run.RoomCount - 1)
         {
-            UI.ShowBossBar(true);
+            UI.ShowBossBar(true, Run.BossName);
             Audio.Play("sfx_boss_roar", 0.9f);
             Cam.Shake(0.25f, 0.7f);
         }
@@ -236,7 +400,7 @@ public class Game : MonoBehaviour
         {
             yield break;
         }
-        if (Run.RoomIndex >= Data.RoomCount - 1)
+        if (Run.RoomIndex >= Run.RoomCount - 1)
         {
             Victory();
             yield break;
@@ -348,8 +512,9 @@ public class Game : MonoBehaviour
         if (State == GameState.Dead) yield break;
         Run.RoomIndex++;
         Rooms.BuildRoom(Run.RoomIndex, false);
-        Debug.Log("[Cardboard] Enter room " + (Run.RoomIndex + 1) + " / " + Data.RoomCount +
-                  " type=" + Data.Rooms[Run.RoomIndex].Type);
+        var rooms = Run.Dungeon.Rooms;
+        Debug.Log("[Cardboard] Enter room " + (Run.RoomIndex + 1) + " / " + Run.RoomCount +
+                  " type=" + rooms[Run.RoomIndex].Type);
         Player.RevivePosition(Rooms.PlayerSpawn);
         Player.SetVisible(true);
         Player.OnRoomStart();
@@ -357,12 +522,12 @@ public class Game : MonoBehaviour
         yield return UI.Wipe(false, 0.5f);
 
         UI.SetSkipHint(false);
-        var room = Data.Rooms[Run.RoomIndex];
+        var room = rooms[Run.RoomIndex];
         UI.ShowBanner(room.Name, room.Subtitle, 1.4f, Data.RoomAccent(room.Type));
         Transitioning = false;
         State = GameState.Combat;
         Player.SetControl(true);
-        if (Run.RoomIndex == Data.RoomCount - 1)
+        if (Run.RoomIndex == Run.RoomCount - 1)
         {
             Audio.Music("music_boss", 1.0f);
             Audio.Play("sfx_boss_roar", 0.9f);
@@ -405,8 +570,9 @@ public class Game : MonoBehaviour
         State = GameState.Victory;
         Time.timeScale = 0f;
         UI.ShowBossBar(false);
-        Run.SaveRecord();
-        UI.ShowEnd(true);
+        var loot = Run.RollVictoryLoot();
+        Run.SaveRecord(true);
+        UI.ShowEnd(true, loot);
         Audio.StopMusic(0.8f);
         Audio.Play("sfx_victory", 0.9f);
     }
@@ -418,7 +584,7 @@ public class Game : MonoBehaviour
         State = GameState.Dead;
         Time.timeScale = 0f;
         UI.ShowBossBar(false);
-        Run.SaveRecord();
+        Run.SaveRecord(false);
         UI.ShowEnd(false);
         Audio.StopMusic(0.8f);
         Audio.Play("sfx_defeat", 0.9f);

@@ -16,6 +16,7 @@ public class Projectile : MonoBehaviour
     private bool slow;
     private bool poison;
     private bool homing;
+    private bool enemyPoison;
     private string spriteName;
     private Color tint;
     private float scale;
@@ -40,11 +41,12 @@ public class Projectile : MonoBehaviour
     }
 
     public static void Enemy(Vector2 pos, Vector2 direction, float dmg, float spd, string sprite, float scale = 1f,
-        float radiusValue = 0.22f, float lifetime = 4f)
+        float radiusValue = 0.22f, float lifetime = 4f, bool poisonOnHit = false)
     {
         var p = Create(pos, direction, dmg, spd, sprite, Color.white, scale, lifetime);
         p.enemyTeam = true;
         p.radius = radiusValue;
+        p.enemyPoison = poisonOnHit;
     }
 
     private static Projectile Create(Vector2 pos, Vector2 direction, float dmg, float spd, string sprite, Color color,
@@ -134,6 +136,7 @@ public class Projectile : MonoBehaviour
                 Vector2.Distance(player.transform.position, transform.position) < radius + 0.32f)
             {
                 player.TakeDamage(damage, transform.position);
+                if (enemyPoison) player.Poison(3.2f, 3.5f);
                 Game.I.Fx.Sprite(spriteName, transform.position, scale * 0.8f, 0.18f, tint, 1600);
                 Game.I.Audio.Play("sfx_hit", 0.35f);
                 Destroy(gameObject);

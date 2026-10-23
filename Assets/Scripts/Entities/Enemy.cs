@@ -55,7 +55,7 @@ public class Enemy : MonoBehaviour
     {
         Def = Data.Enemy(kind);
         Elite = elite;
-        Boss = kind == EnemyKind.Lich;
+        Boss = Def.Boss;
         MaxHp = Def.Hp * hpScale * (elite ? 2.1f : 1f);
         Hp = MaxHp;
         Damage = Def.Damage * damageScale * (elite ? 1.25f : 1f);
@@ -76,7 +76,10 @@ public class Enemy : MonoBehaviour
         if (elite) Visual.AddAura(Game.I.Art, Pal.Gold, 1.35f);
         if (Boss)
         {
-            Visual.AddAura(Game.I.Art, new Color(0.7f, 0.35f, 0.8f), 1.6f);
+            Color aura = kind == EnemyKind.BoneKing ? new Color(0.65f, 1f, 0.7f) :
+                kind == EnemyKind.SpiderQueen ? new Color(1f, 0.35f, 0.65f) :
+                new Color(0.7f, 0.35f, 0.9f);
+            Visual.AddAura(Game.I.Art, aura, 1.6f);
         }
 
         float h = Visual.Main.sprite.bounds.size.y * scale;
@@ -169,16 +172,30 @@ public class Enemy : MonoBehaviour
             case EnemyKind.Skeleton:
                 ArcherAI(player, dir, dist, dt);
                 break;
+            case EnemyKind.Wraith:
+                WraithAI(player, dir, dist, dt);
+                break;
             case EnemyKind.Shaman:
                 ShamanAI(player, dir, dist, dt);
                 break;
+            case EnemyKind.PlagueDoctor:
+                PlagueAI(player, dir, dist, dt);
+                break;
             case EnemyKind.Boar:
                 BoarAI(player, dir, dist, dt);
+                break;
+            case EnemyKind.Hound:
+                BoarAI(player, dir, dist, dt);
+                break;
+            case EnemyKind.Executioner:
+                MeleeAI(player, dir, dist, dt, 0.78f);
                 break;
             case EnemyKind.Bomber:
                 BomberAI(player, dir, dist, dt);
                 break;
             case EnemyKind.Lich:
+            case EnemyKind.BoneKing:
+            case EnemyKind.SpiderQueen:
                 BossAI(player, dir, dist, dt);
                 break;
         }
@@ -282,6 +299,69 @@ public class Enemy : MonoBehaviour
             windup = 0.36f;
             Visual.Windup(windup);
             Visual.Flash(new Color(0.9f, 0.85f, 0.7f), 0.2f);
+        }
+    }
+
+    private void WraithAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (specialCd <= 0f && dist < 3.6f)
+        {
+            specialCd = 6.2f;
+            StartCoroutine(WraithBlink());
+            return;
+        }
+        ArcherAI(player, dir, dist, dt);
+    }
+
+    private IEnumerator WraithBlink()
+    {
+        Visual.SetVisible(false);
+        Game.I.Fx.Burst("fx_soul", transform.position, 6, 1.2f, 0.35f, 0.3f,
+            new Color(0.45f, 0.85f, 1f, 0.8f), 1600);
+        Game.I.Audio.Play("sfx_dash", 0.55f, 0.8f);
+        yield return new WaitForSeconds(0.22f);
+        if (Dead || Game.I == null) yield break;
+        Vector2 p = Game.I.Rooms.RandomArenaPoint(1.8f);
+        if (Vector2.Distance(p, Game.I.Player.transform.position) < 2.4f)
+        {
+            p = Game.I.Rooms.RandomArenaPoint(2.2f);
+        }
+        transform.position = p;
+        Visual.SetVisible(true);
+        Visual.SpawnPop(0.3f);
+        Game.I.Fx.Explosion(transform.position, 1.1f, new Color(0.4f, 0.8f, 1f));
+    }
+
+    private void PlagueAI(Player player, Vector2 dir, float dist, float dt)
+    {
+        if (winding)
+        {
+            windup -= dt;
+            if (windup <= 0f)
+            {
+                winding = false;
+                attackCd = Def.Cooldown;
+                Visual.Attack(dir, 0.85f);
+                Shoot(player, dir, "proj_poison", 9.2f, 1.05f, true);
+                Game.I.Audio.Play("sfx_cast", 0.5f);
+            }
+            return;
+        }
+
+        if (dist < 4.4f) MoveDir(-dir, Def.Speed, dt);
+        else if (dist > 6.8f) MoveDir(dir, Def.Speed, dt);
+        else
+        {
+            Vector2 side = new Vector2(-dir.y, dir.x);
+            MoveDir(side * (Mathf.Sin(Time.time * 0.7f) > 0f ? 1f : -1f), 0.45f, dt);
+        }
+
+        if (attackCd <= 0f && dist < 7.5f)
+        {
+            winding = true;
+            windup = 0.48f;
+            Visual.Windup(windup);
+            Visual.Flash(new Color(0.7f, 1f, 0.6f), 0.2f);
         }
     }
 
@@ -451,9 +531,12 @@ public class Enemy : MonoBehaviour
         if (!phase2 && Hp < MaxHp * 0.5f)
         {
             phase2 = true;
-            Visual.SetTint(new Color(0.9f, 0.62f, 0.85f));
-            baseTint = new Color(0.9f, 0.62f, 0.85f);
-            Game.I.Fx.Explosion(transform.position, 2.2f, new Color(0.7f, 0.35f, 0.85f));
+            Color phaseTint = Def.Kind == EnemyKind.BoneKing ? new Color(0.7f, 1f, 0.72f) :
+                Def.Kind == EnemyKind.SpiderQueen ? new Color(1f, 0.55f, 0.78f) :
+                new Color(0.9f, 0.62f, 0.85f);
+            Visual.SetTint(phaseTint);
+            baseTint = phaseTint;
+            Game.I.Fx.Explosion(transform.position, 2.2f, phaseTint);
             Game.I.Audio.Play("sfx_boss_roar", 1f);
             Game.I.Shake(0.35f, 0.8f);
             Game.I.Hitstop(0.08f);
@@ -496,7 +579,7 @@ public class Enemy : MonoBehaviour
                 float a = i * Mathf.PI * 2f / count + Time.time * 0.3f;
                 Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
                 Projectile.Enemy(transform.position + Vector3.up * 0.9f, d, Damage * 0.75f, 5.6f,
-                    "proj_skull", 1.4f, 0.26f, 5f);
+                    Def.Projectile, 1.4f, 0.26f, 5f);
             }
             Game.I.Audio.Play("sfx_cast", 0.8f);
         }
@@ -539,7 +622,7 @@ public class Enemy : MonoBehaviour
             {
                 float a = i * Mathf.PI * 2f / count;
                 Projectile.Enemy(transform.position + Vector3.up * 0.9f, new Vector2(Mathf.Cos(a), Mathf.Sin(a)),
-                    Damage * 0.65f, 6f, "proj_skull", 1.3f, 0.26f, 5f);
+                    Damage * 0.65f, 6f, Def.Projectile, 1.3f, 0.26f, 5f);
             }
         }
 
@@ -569,11 +652,11 @@ public class Enemy : MonoBehaviour
         Visual.Walking = true;
     }
 
-    private void Shoot(Player player, Vector2 dir, string sprite, float speed, float scale)
+    private void Shoot(Player player, Vector2 dir, string sprite, float speed, float scale, bool poison = false)
     {
         Vector2 origin = (Vector2)transform.position + Vector2.up * 0.8f;
         Vector2 d = ((Vector2)player.transform.position + Vector2.up * 0.55f - origin).normalized;
-        Projectile.Enemy(origin, d, Damage, speed, sprite, scale, 0.2f, 5f);
+        Projectile.Enemy(origin, d, Damage, speed, sprite, scale, 0.2f, 5f, poison);
         Game.I.Audio.Play(sprite == "proj_arrow" ? "sfx_shoot" : "sfx_cast", 0.5f, 0.85f);
     }
 
@@ -625,6 +708,7 @@ public class Enemy : MonoBehaviour
     {
         if (Dead) return;
         if (Def.Kind == EnemyKind.Guard) amount *= 0.68f;
+        if (Def.Kind == EnemyKind.Executioner) amount *= 0.86f;
         Hp -= amount;
         if (playerSource)
         {

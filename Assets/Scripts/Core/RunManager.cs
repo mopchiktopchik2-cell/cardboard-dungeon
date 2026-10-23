@@ -8,14 +8,26 @@ public class RunManager : MonoBehaviour
     public float DamageDealt;
     public float DamageTaken;
     public float RunTime;
+    public DungeonDef Dungeon;
+    public HeroClass Hero;
+    public LootRoll VictoryLoot;
     public readonly Dictionary<string, int> PerkCounts = new Dictionary<string, int>();
     public readonly List<PerkDef> TakenPerks = new List<PerkDef>();
 
-    public float EnemyHpScale => 1f + RoomIndex * 0.16f;
-    public float EnemyDamageScale => 1f + RoomIndex * 0.10f;
+    public int RoomCount => Dungeon != null ? Dungeon.Rooms.Length : Data.RoomCount;
+    public string BossName => Dungeon != null ? Dungeon.BossName : "ЛИЧ-ПЕРЕПЛЁТ";
+
+    public float EnemyHpScale =>
+        (Dungeon != null ? Dungeon.HpScale : 1f) * (1f + RoomIndex * (Dungeon != null ? Dungeon.PerRoomHp : 0.16f));
+
+    public float EnemyDamageScale =>
+        (Dungeon != null ? Dungeon.DamageScale : 1f) *
+        (1f + RoomIndex * (Dungeon != null ? Dungeon.PerRoomDamage : 0.10f));
 
     public void Init()
     {
+        Dungeon = MetaProgress.SelectedDungeon;
+        Hero = MetaProgress.SelectedClass;
     }
 
     private void Update()
@@ -28,17 +40,26 @@ public class RunManager : MonoBehaviour
 
     public void StartRun()
     {
+        Dungeon = MetaProgress.SelectedDungeon;
+        Hero = MetaProgress.SelectedClass;
         RoomIndex = 0;
         Kills = 0;
         DamageDealt = 0f;
         DamageTaken = 0f;
         RunTime = 0f;
+        VictoryLoot = null;
         PerkCounts.Clear();
         TakenPerks.Clear();
         Game.I.Player.ResetForRun();
         Game.I.Skills.ResetForRun();
         Game.I.UI.RefreshRoom();
         Game.I.UI.RefreshSkills();
+    }
+
+    public LootRoll RollVictoryLoot()
+    {
+        VictoryLoot = MetaProgress.RollDungeonDrop(Dungeon);
+        return VictoryLoot;
     }
 
     public void OnKill(Enemy enemy)
@@ -204,24 +225,14 @@ public class RunManager : MonoBehaviour
         return false;
     }
 
-    public void SaveRecord()
+    public void SaveRecord(bool victory = false)
     {
-        int bestRoom = PlayerPrefs.GetInt("best_room", 0);
-        int bestKills = PlayerPrefs.GetInt("best_kills", 0);
-        int reached = RoomIndex + 1;
-        if (reached > bestRoom)
-        {
-            bestRoom = reached;
-            PlayerPrefs.SetInt("best_room", bestRoom);
-        }
-        if (Kills > bestKills)
-        {
-            bestKills = Kills;
-            PlayerPrefs.SetInt("best_kills", bestKills);
-        }
-        PlayerPrefs.Save();
+        if (Dungeon == null) return;
+        int reached = victory ? RoomCount : Mathf.Clamp(RoomIndex + 1, 1, RoomCount);
+        MetaProgress.RecordRun(Dungeon.Id, reached, Kills, victory);
     }
 
-    public int BestRoom => PlayerPrefs.GetInt("best_room", 0);
-    public int BestKills => PlayerPrefs.GetInt("best_kills", 0);
+    public int BestRoom => Dungeon != null ? MetaProgress.BestRoom(Dungeon.Id) : 0;
+    public int BestKills => Dungeon != null ? MetaProgress.BestKills(Dungeon.Id) : 0;
+    public int Clears => Dungeon != null ? MetaProgress.Clears(Dungeon.Id) : 0;
 }

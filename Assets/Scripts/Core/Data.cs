@@ -19,7 +19,13 @@ public enum EnemyKind
     Guard,
     Shaman,
     Spider,
-    Lich
+    Lich,
+    Wraith,
+    Executioner,
+    PlagueDoctor,
+    Hound,
+    BoneKing,
+    SpiderQueen
 }
 
 public class SkillDef
@@ -73,6 +79,8 @@ public class EnemyDef
     public float Range;
     public float Cooldown;
     public float Scale;
+    public bool Boss;
+    public string Projectile = "proj_skull";
 
     public EnemyDef Clone()
     {
@@ -86,13 +94,15 @@ public class RoomDef
     public readonly string Name;
     public readonly string Subtitle;
     public readonly int Waves;
+    public readonly string Theme;
 
-    public RoomDef(RoomType type, string name, string subtitle, int waves)
+    public RoomDef(RoomType type, string name, string subtitle, int waves, string theme = null)
     {
         Type = type;
         Name = name;
         Subtitle = subtitle;
         Waves = waves;
+        Theme = theme;
     }
 }
 
@@ -113,7 +123,7 @@ public static class Pal
     public static readonly Color Dark2 = new Color32(42, 32, 51, 255);
 }
 
-public static class Data
+public static partial class Data
 {
     public const int RoomCount = 12;
     public const int MaxSkillSlots = 5;
@@ -179,7 +189,8 @@ public static class Data
         [EnemyKind.Skeleton] = new EnemyDef
         {
             Kind = EnemyKind.Skeleton, Name = "СКЕЛЕТ-ЛУЧНИК", Sprite = "skeleton",
-            Hp = 34, Speed = 2.45f, Damage = 10, Range = 5.2f, Cooldown = 1.85f, Scale = 1.0f
+            Hp = 34, Speed = 2.45f, Damage = 10, Range = 5.2f, Cooldown = 1.85f, Scale = 1.0f,
+            Projectile = "proj_arrow"
         },
         [EnemyKind.Boar] = new EnemyDef
         {
@@ -208,26 +219,47 @@ public static class Data
         },
         [EnemyKind.Lich] = new EnemyDef
         {
-            Kind = EnemyKind.Lich, Name = "ЛИЧ-ПЕРЕПЛЁТ", Sprite = "lich",
-            Hp = 1180, Speed = 1.5f, Damage = 24, Range = 8f, Cooldown = 2.1f, Scale = 1.45f
+            Kind = EnemyKind.Lich, Name = "ЛИЧ-ПЕРЕПЛЁТ", Sprite = "lich_abyss",
+            Hp = 1680, Speed = 1.5f, Damage = 27, Range = 8f, Cooldown = 2.1f, Scale = 1.5f,
+            Boss = true, Projectile = "proj_skull"
+        },
+        [EnemyKind.Wraith] = new EnemyDef
+        {
+            Kind = EnemyKind.Wraith, Name = "ПРИЗРАК-ЛУЧНИК", Sprite = "wraith",
+            Hp = 58, Speed = 2.35f, Damage = 13, Range = 6.4f, Cooldown = 2.15f, Scale = 1.05f,
+            Projectile = "proj_soul"
+        },
+        [EnemyKind.Executioner] = new EnemyDef
+        {
+            Kind = EnemyKind.Executioner, Name = "ПАЛАЧ", Sprite = "executioner",
+            Hp = 168, Speed = 1.55f, Damage = 29, Range = 1.35f, Cooldown = 2.15f, Scale = 1.18f
+        },
+        [EnemyKind.PlagueDoctor] = new EnemyDef
+        {
+            Kind = EnemyKind.PlagueDoctor, Name = "ЧУМНОЙ ДОКТОР", Sprite = "plague_doctor",
+            Hp = 76, Speed = 2.0f, Damage = 11, Range = 6.2f, Cooldown = 2.7f, Scale = 1.02f,
+            Projectile = "proj_poison"
+        },
+        [EnemyKind.Hound] = new EnemyDef
+        {
+            Kind = EnemyKind.Hound, Name = "ГОЛОДНЫЙ ГОНЧИЙ", Sprite = "hound",
+            Hp = 46, Speed = 4.25f, Damage = 14, Range = 5.2f, Cooldown = 2.45f, Scale = 0.98f
+        },
+        [EnemyKind.BoneKing] = new EnemyDef
+        {
+            Kind = EnemyKind.BoneKing, Name = "КОСТЯНОЙ КОРОЛЬ", Sprite = "bone_king",
+            Hp = 980, Speed = 1.4f, Damage = 20, Range = 7.4f, Cooldown = 2.2f, Scale = 1.45f,
+            Boss = true, Projectile = "proj_bone"
+        },
+        [EnemyKind.SpiderQueen] = new EnemyDef
+        {
+            Kind = EnemyKind.SpiderQueen, Name = "МАТКА ПАУКОВ", Sprite = "spider_queen",
+            Hp = 1260, Speed = 1.65f, Damage = 23, Range = 7.2f, Cooldown = 2.0f, Scale = 1.5f,
+            Boss = true, Projectile = "proj_poison"
         }
     };
 
-    public static readonly RoomDef[] Rooms =
-    {
-        new RoomDef(RoomType.Combat, "ПОГРЕБ", "Здесь пахнет клеем и старой бумагой.", 2),
-        new RoomDef(RoomType.Combat, "КЛАДОВАЯ", "Кто-то оставил здесь свои кости.", 2),
-        new RoomDef(RoomType.Elite, "СТРАЖНИЦА", "Щит не пропустит просто так.", 1),
-        new RoomDef(RoomType.Combat, "КОРИДОР КОСТЕЙ", "Стены сложены из чьих-то рёбер.", 3),
-        new RoomDef(RoomType.Treasure, "СОКРОВИЩНИЦА", "Сундук ждал именно тебя.", 0),
-        new RoomDef(RoomType.Combat, "ЗАЛ ПАУТИНЫ", "Не трогай липкие нити.", 2),
-        new RoomDef(RoomType.Elite, "АЛТАРЬ", "Кто-то здесь ещё молится.", 2),
-        new RoomDef(RoomType.Rest, "ПРИВАЛ", "Можно перевести дух.", 0),
-        new RoomDef(RoomType.Combat, "ТЁМНЫЙ ПРЕДЕЛ", "Свет факелов едва достаёт до стен.", 3),
-        new RoomDef(RoomType.Combat, "ЗАЛ ПЕЧАТЕЙ", "Каждый шаг отдаётся эхом.", 3),
-        new RoomDef(RoomType.Elite, "ТРОННЫЙ ПРЕДДВЕР", "За дверью что-то шевелится.", 2),
-        new RoomDef(RoomType.Boss, "ТРОН ЛИЧА", "Он ждал тебя все эти страницы.", 1)
-    };
+    public static RoomDef[] Rooms => Dungeons[0].Rooms;
 
     public static SkillDef Skill(string id)
     {

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Быстрые проверки контента. Запускаются из редактора (Cardboard/Run Self Tests)
+/// Быстрые проверки контента v1.2. Запускаются из редактора (Cardboard/Run Self Tests)
 /// и не зависят от сцены или запущенной игры.
 /// </summary>
 public static class SelfTest
@@ -14,12 +14,15 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin");
+        Debug.Log("[SelfTest] begin v1.2");
 
         CheckSkills();
         CheckPerks();
+        CheckClasses();
+        CheckDungeons();
         CheckEnemies();
         CheckRooms();
+        CheckEquipment();
         CheckAssets();
         CheckBalance();
 
@@ -88,9 +91,97 @@ public static class SelfTest
         Check(Data.Perk("nope") == null, "unknown perk returns null");
     }
 
+    private static void CheckClasses()
+    {
+        Check(Data.HeroClasses.Count == 3, "hero classes = 3, got " + Data.HeroClasses.Count);
+        var ids = new HashSet<HeroClass>();
+        var styles = new HashSet<HeroAttackStyle>();
+        foreach (var hero in Data.HeroClasses)
+        {
+            Check(hero != null, "hero class is null");
+            if (hero == null) continue;
+            Check(ids.Add(hero.Id), "duplicate hero class: " + hero.Id);
+            Check(styles.Add(hero.Style), "duplicate hero attack style: " + hero.Id);
+            Check(!string.IsNullOrEmpty(hero.Name), "hero name is empty: " + hero.Id);
+            Check(!string.IsNullOrEmpty(hero.Title), "hero title is empty: " + hero.Id);
+            Check(!string.IsNullOrEmpty(hero.Desc), "hero desc is empty: " + hero.Id);
+            Check(ArtExists(hero.Sprite), "hero sprite missing: " + hero.Sprite);
+            Check(hero.Hp > 60f, "hero hp too low: " + hero.Id);
+            Check(hero.Damage > 0f && hero.AttackInterval > 0.2f, "hero attack stats invalid: " + hero.Id);
+            Check(hero.Speed > 3f && hero.Range > 0.5f, "hero movement stats invalid: " + hero.Id);
+        }
+
+        Check(Data.Hero(HeroClass.Mage).Style == HeroAttackStyle.Bolt, "mage uses bolts");
+        Check(Data.Hero(HeroClass.Swordsman).Style == HeroAttackStyle.Slash, "swordsman uses slashes");
+        Check(Data.Hero(HeroClass.Ranger).Style == HeroAttackStyle.Arrow, "ranger uses arrows");
+        Check(Data.Hero(HeroClass.Swordsman).Hp > Data.Hero(HeroClass.Mage).Hp, "swordsman is tougher than mage");
+        Check(Data.Hero(HeroClass.Ranger).AttackInterval < Data.Hero(HeroClass.Swordsman).AttackInterval,
+            "ranger attacks faster than swordsman");
+    }
+
+    private static void CheckDungeons()
+    {
+        Check(Data.Dungeons.Count == 3, "dungeons = 3, got " + Data.Dungeons.Count);
+        var ids = new HashSet<string>();
+        float lastHp = 0f;
+        float lastDamage = 0f;
+        float lastDrop = 0f;
+        int lastTier = 0;
+        for (int i = 0; i < Data.Dungeons.Count; i++)
+        {
+            var d = Data.Dungeons[i];
+            Check(d != null, "dungeon is null");
+            if (d == null) continue;
+            Check(ids.Add(d.Id), "duplicate dungeon id: " + d.Id);
+            Check(!string.IsNullOrEmpty(d.Name), "dungeon name is empty: " + d.Id);
+            Check(!string.IsNullOrEmpty(d.Tagline), "dungeon tagline is empty: " + d.Id);
+            Check(!string.IsNullOrEmpty(d.Lore), "dungeon lore is empty: " + d.Id);
+            Check(d.Difficulty == (DungeonDifficulty)i, "dungeon order/difficulty mismatch: " + d.Id);
+            Check(ArtExists("ui_dungeon_" + d.Id), "dungeon emblem missing: " + d.Id);
+            Check(ArtExists(d.FloorA) && ArtExists(d.FloorB), "dungeon floor missing: " + d.Id);
+            Check(ArtExists(d.Wall), "dungeon wall missing: " + d.Id);
+            Check(d.Rooms != null && d.Rooms.Length == Data.RoomCount, "dungeon room count mismatch: " + d.Id);
+            Check(d.Pool != null && d.Pool.Length >= 4, "dungeon enemy pool too small: " + d.Id);
+
+            var boss = Data.Enemies.ContainsKey(d.BossKind) ? Data.Enemies[d.BossKind] : null;
+            Check(boss != null && boss.Boss, "dungeon boss invalid: " + d.Id);
+            Check(boss != null && d.BossName == boss.Name, "dungeon boss name mismatch: " + d.Id);
+            if (boss != null) Check(ArtExists(boss.Sprite), "dungeon boss sprite missing: " + d.Id);
+
+            for (int j = 0; j < d.Pool.Length; j++)
+            {
+                Check(Data.Enemies.ContainsKey(d.Pool[j]), "dungeon pool has unknown enemy: " + d.Id);
+            }
+            Check(d.HpScale > lastHp, "dungeon hp scale must grow: " + d.Id);
+            Check(d.DamageScale > lastDamage, "dungeon damage scale must grow: " + d.Id);
+            Check(d.DropChance > lastDrop, "dungeon drop chance must grow: " + d.Id);
+            Check(d.LootTier == lastTier + 1, "dungeon loot tier must grow: " + d.Id);
+            Check(d.HpScale > 0.5f && d.DamageScale > 0.5f, "dungeon scaling too low: " + d.Id);
+            Check(d.PerRoomHp >= 0f && d.PerRoomDamage >= 0f, "dungeon per-room scaling invalid: " + d.Id);
+            lastHp = d.HpScale;
+            lastDamage = d.DamageScale;
+            lastDrop = d.DropChance;
+            lastTier = d.LootTier;
+        }
+
+        Check(Data.Dungeon("crypt").Difficulty == DungeonDifficulty.Easy, "crypt is easy");
+        Check(Data.Dungeon("web").Difficulty == DungeonDifficulty.Medium, "web is medium");
+        Check(Data.Dungeon("throne").Difficulty == DungeonDifficulty.Hard, "throne is hard");
+        Check(Mathf.Abs(Data.Dungeons[0].DropChance - 0.45f) < 0.001f, "easy drop chance is 45%");
+        Check(Mathf.Abs(Data.Dungeons[1].DropChance - 0.65f) < 0.001f, "medium drop chance is 65%");
+        Check(Mathf.Abs(Data.Dungeons[2].DropChance - 0.85f) < 0.001f, "hard drop chance is 85%");
+    }
+
     private static void CheckEnemies()
     {
-        Check(Data.Enemies.Count == 8, "enemy count = 8, got " + Data.Enemies.Count);
+        Check(Data.Enemies.Count == 14, "enemy count = 14, got " + Data.Enemies.Count);
+        var sprites = new HashSet<string>();
+        var bossKinds = new HashSet<EnemyKind>
+        {
+            EnemyKind.BoneKing, EnemyKind.SpiderQueen, EnemyKind.Lich
+        };
+        int bosses = 0;
+        float strongestRegular = 0f;
         foreach (EnemyKind kind in System.Enum.GetValues(typeof(EnemyKind)))
         {
             Check(Data.Enemies.ContainsKey(kind), "enemy definition missing: " + kind);
@@ -102,66 +193,188 @@ public static class SelfTest
             Check(e.Speed > 0f, "enemy speed must be positive: " + kind);
             Check(e.Damage > 0f, "enemy damage must be positive: " + kind);
             Check(e.Range > 0f, "enemy range must be positive: " + kind);
+            Check(e.Scale > 0.4f && e.Scale < 2.5f, "enemy scale out of range: " + kind);
             Check(ArtExists(e.Sprite), "enemy sprite missing: " + e.Sprite);
+            Check(sprites.Add(e.Sprite), "enemy sprite reused: " + e.Sprite);
+            Check(e.Boss == bossKinds.Contains(kind), "enemy boss flag mismatch: " + kind);
+            if (e.Boss)
+            {
+                bosses++;
+                Check(e.Hp >= 900f, "boss hp too low: " + kind);
+                Check(!string.IsNullOrEmpty(e.Projectile) && ArtExists(e.Projectile),
+                    "boss projectile missing: " + kind);
+            }
+            else
+            {
+                strongestRegular = Mathf.Max(strongestRegular, e.Hp);
+            }
         }
 
-        var boss = Data.Enemy(EnemyKind.Lich);
-        float strongest = 0f;
-        foreach (var e in Data.Enemies.Values)
+        Check(bosses == 3, "exactly three bosses, got " + bosses);
+        foreach (var kind in bossKinds)
         {
-            if (e.Kind != EnemyKind.Lich) strongest = Mathf.Max(strongest, e.Hp);
+            var boss = Data.Enemy(kind);
+            Check(boss != null && boss.Hp > strongestRegular * 4f,
+                "boss must be much tougher than regular enemies: " + kind);
         }
-        Check(boss.Hp > strongest * 3f, "boss must be much tougher than regular enemies");
-        Check(boss.Hp >= 500f, "boss hp must be at least 500");
+        Check(Data.Enemy(EnemyKind.Lich).Hp > Data.Enemy(EnemyKind.SpiderQueen).Hp, "lich is the final boss");
+        Check(Data.Enemy(EnemyKind.SpiderQueen).Hp > Data.Enemy(EnemyKind.BoneKing).Hp,
+            "spider queen is harder than bone king");
+        Check(Data.Enemy(EnemyKind.Executioner).Hp > Data.Enemy(EnemyKind.Guard).Hp,
+            "executioner is tougher than guard");
     }
 
     private static void CheckRooms()
     {
-        Check(Data.Rooms.Length == Data.RoomCount, "room defs match RoomCount");
         Check(Data.RoomCount == 12, "room count = 12");
-        Check(Data.Rooms[Data.Rooms.Length - 1].Type == RoomType.Boss, "last room is boss room");
+        Check(Data.Rooms.Length == Data.RoomCount, "room defs match RoomCount");
 
-        var names = new HashSet<string>();
-        int combat = 0;
-        foreach (var r in Data.Rooms)
+        var allNames = new HashSet<string>();
+        var allThemes = new HashSet<string>();
+        var checkedAssets = new HashSet<string>();
+        int totalRooms = 0;
+        foreach (var dungeon in Data.Dungeons)
         {
-            Check(r != null, "room is null");
-            if (r == null) continue;
-            Check(!string.IsNullOrEmpty(r.Name), "room name is empty");
-            Check(names.Add(r.Name), "duplicate room name: " + r.Name);
-            Check(!string.IsNullOrEmpty(r.Subtitle), "room subtitle is empty: " + r.Name);
-            Check(r.Waves >= 0 && r.Waves <= 4, "room waves out of range: " + r.Name);
-            if (r.Type == RoomType.Combat || r.Type == RoomType.Elite)
+            Check(dungeon.Rooms != null && dungeon.Rooms.Length == Data.RoomCount,
+                "dungeon must have 12 rooms: " + dungeon.Id);
+            if (dungeon.Rooms == null) continue;
+            Check(dungeon.Rooms[dungeon.Rooms.Length - 1].Type == RoomType.Boss,
+                "last room is boss room: " + dungeon.Id);
+
+            bool treasure = false;
+            bool rest = false;
+            foreach (var room in dungeon.Rooms)
             {
-                combat++;
-                Check(r.Waves > 0, "combat room must have waves: " + r.Name);
+                totalRooms++;
+                Check(room != null, "room is null");
+                if (room == null) continue;
+                Check(!string.IsNullOrEmpty(room.Name), "room name is empty");
+                Check(allNames.Add(room.Name), "duplicate room name across dungeons: " + room.Name);
+                Check(!string.IsNullOrEmpty(room.Subtitle), "room subtitle is empty: " + room.Name);
+                Check(room.Waves >= 0 && room.Waves <= 4, "room waves out of range: " + room.Name);
+                Check(!string.IsNullOrEmpty(room.Theme), "room theme is empty: " + room.Name);
+                var theme = Data.Theme(room.Theme);
+                Check(theme != null && theme.Id == room.Theme, "room theme missing: " + room.Theme);
+                Check(allThemes.Add(room.Theme), "room theme reused: " + room.Theme);
+                if (room.Type == RoomType.Combat || room.Type == RoomType.Elite)
+                {
+                    Check(room.Waves > 0, "combat room must have waves: " + room.Name);
+                }
+                if (room.Type == RoomType.Treasure)
+                {
+                    treasure = true;
+                    Check(room.Waves == 0, "treasure room must have zero waves: " + room.Name);
+                }
+                if (room.Type == RoomType.Rest)
+                {
+                    rest = true;
+                    Check(room.Waves == 0, "rest room must have zero waves: " + room.Name);
+                }
+                if (theme != null)
+                {
+                    CheckThemeAssets(theme, checkedAssets);
+                }
             }
-            if (r.Type == RoomType.Treasure || r.Type == RoomType.Rest)
+            Check(treasure, "dungeon has a treasure room: " + dungeon.Id);
+            Check(rest, "dungeon has a rest room: " + dungeon.Id);
+        }
+
+        Check(totalRooms == 36, "total named rooms = 36, got " + totalRooms);
+        Check(allNames.Count == 36, "all room names are unique, got " + allNames.Count);
+        Check(allThemes.Count == 36, "all room themes are unique, got " + allThemes.Count);
+        Check(Data.Rooms[Data.Rooms.Length - 1].Type == RoomType.Boss, "easy dungeon ends with boss");
+    }
+
+    private static void CheckThemeAssets(RoomTheme theme, HashSet<string> seen)
+    {
+        if (theme == null) return;
+        if (seen.Add(theme.Floor)) Check(ArtExists(theme.Floor), "theme floor missing: " + theme.Floor);
+        if (seen.Add(theme.Wall)) Check(ArtExists(theme.Wall), "theme wall missing: " + theme.Wall);
+        if (!string.IsNullOrEmpty(theme.Centerpiece) && seen.Add(theme.Centerpiece))
+        {
+            Check(ArtExists(theme.Centerpiece), "theme centerpiece missing: " + theme.Centerpiece);
+        }
+        Check(theme.Props != null && theme.Props.Length >= 3, "theme needs at least 3 props: " + theme.Id);
+        if (theme.Props != null)
+        {
+            foreach (var prop in theme.Props)
             {
-                Check(r.Waves == 0, "non-combat room must have zero waves: " + r.Name);
+                if (!seen.Add(prop)) continue;
+                Check(ArtExists(prop), "theme prop missing: " + prop);
             }
         }
-        Check(combat >= 8, "at least eight combat/elite rooms");
-        Check(Data.Rooms[4].Type == RoomType.Treasure, "room 5 is treasure");
-        Check(Data.Rooms[7].Type == RoomType.Rest, "room 8 is rest");
+        Check(theme.PropCount >= 2 && theme.PropCount <= 8, "theme prop count out of range: " + theme.Id);
+    }
+
+    private static void CheckEquipment()
+    {
+        Check(Data.Equipment.Count == 12, "equipment count = 12, got " + Data.Equipment.Count);
+        var ids = new HashSet<string>();
+        var names = new HashSet<string>();
+        var slots = new Dictionary<EquipSlot, int>();
+        var rarities = new Dictionary<Rarity, int>();
+        foreach (var item in Data.Equipment)
+        {
+            Check(item != null, "equipment item is null");
+            if (item == null) continue;
+            Check(!string.IsNullOrEmpty(item.Id), "equipment id is empty");
+            Check(ids.Add(item.Id), "duplicate equipment id: " + item.Id);
+            Check(!string.IsNullOrEmpty(item.Name), "equipment name is empty: " + item.Id);
+            Check(names.Add(item.Name), "duplicate equipment name: " + item.Id);
+            Check(!string.IsNullOrEmpty(item.Desc), "equipment desc is empty: " + item.Id);
+            Check(ArtExists(item.Icon), "equipment icon missing: " + item.Icon);
+            Check(item.Tier >= 1 && item.Tier <= 3, "equipment tier out of range: " + item.Id);
+            Check(item.Weight > 0f, "equipment weight must be positive: " + item.Id);
+            Check(!string.IsNullOrEmpty(item.StatLine()), "equipment has no stats: " + item.Id);
+
+            if (!slots.ContainsKey(item.Slot)) slots[item.Slot] = 0;
+            slots[item.Slot]++;
+            if (!rarities.ContainsKey(item.Rarity)) rarities[item.Rarity] = 0;
+            rarities[item.Rarity]++;
+        }
+
+        Check(slots.Count == 3, "all three equipment slots are used");
+        foreach (EquipSlot slot in System.Enum.GetValues(typeof(EquipSlot)))
+        {
+            Check(slots.ContainsKey(slot) && slots[slot] >= 3, "slot has at least three items: " + slot);
+        }
+        Check(rarities.ContainsKey(Rarity.Common) && rarities[Rarity.Common] >= 3, "common items exist");
+        Check(rarities.ContainsKey(Rarity.Rare) && rarities[Rarity.Rare] >= 3, "rare items exist");
+        Check(rarities.ContainsKey(Rarity.Epic) && rarities[Rarity.Epic] >= 2, "epic items exist");
+        Check(rarities.ContainsKey(Rarity.Legendary) && rarities[Rarity.Legendary] >= 2, "legendary items exist");
+        Check(Data.Equipment.Find(e => e.Id == "kingsbane") != null, "kingsbane exists");
+        Check(Data.Equipment.Find(e => e.Id == "lich_seal") != null, "lich seal exists");
     }
 
     private static void CheckAssets()
     {
-        Check(ArtExists("wizard"), "player sprite exists");
-        Check(ArtExists("table_bg"), "table background exists");
-        Check(ArtExists("floor"), "floor exists");
-        Check(ArtExists("floor_boss"), "boss floor exists");
-        Check(ArtExists("prop_chest"), "chest exists");
-        Check(ArtExists("prop_campfire"), "campfire exists");
-        Check(ArtExists("fx_slash"), "slash effect exists");
-        Check(ArtExists("fx_glow"), "glow effect exists");
-        Check(ArtExists("ui_menu_bg"), "v1.1 menu backdrop exists");
-        Check(ArtExists("ui_menu_frame"), "v1.1 menu frame exists");
-        Check(ArtExists("ui_rune"), "v1.1 rune exists");
-        Check(ArtExists("ui_divider"), "v1.1 divider exists");
-        Check(ArtExists("fx_ember"), "ember particle exists");
-        Check(ArtExists("fx_mote"), "ambient mote exists");
+        string[] textures =
+        {
+            "wizard", "swordsman", "ranger",
+            "imp", "skeleton", "boar", "bomber", "guard", "shaman", "spider",
+            "wraith", "executioner", "plague_doctor", "hound",
+            "bone_king", "spider_queen", "lich_abyss",
+            "floor_crypt_a", "floor_crypt_b", "floor_web_a", "floor_web_b",
+            "floor_throne_a", "floor_throne_b", "wall_crypt", "wall_web", "wall_throne",
+            "proj_soul", "proj_bone", "proj_skull", "proj_poison", "proj_arrow",
+            "fx_soul", "fx_slash", "fx_glow", "fx_ember", "fx_mote",
+            "ui_menu_bg", "ui_menu_frame", "ui_rune", "ui_divider", "ui_logo",
+            "ui_card_dark", "ui_panel_dark", "ui_panel",
+            "ui_dungeon_crypt", "ui_dungeon_web", "ui_dungeon_throne",
+            "eq_rusty_blade", "eq_grave_cleaver", "eq_widow_fang", "eq_kingsbane",
+            "eq_patched_cloak", "eq_web_carapace", "eq_royal_shroud",
+            "eq_bone_charm", "eq_ember_eye", "eq_spider_heart", "eq_lich_seal", "eq_crown_of_ashes",
+            "prop_chest", "prop_campfire", "prop_torch", "prop_column", "prop_rock", "prop_bones",
+            "prop_barrel", "prop_crate", "prop_moss", "prop_sarcophagus", "prop_rack", "prop_shield",
+            "prop_chain", "prop_cage", "prop_skullpile", "prop_ribs", "prop_candles", "prop_web",
+            "prop_cocoon", "prop_altar", "prop_banner", "prop_throne", "prop_bone_arch", "prop_eggs",
+            "prop_roots", "prop_acid", "prop_web_throne", "prop_gate", "prop_blood", "prop_mirror",
+            "prop_cauldron", "table_bg", "floor", "floor_boss"
+        };
+        foreach (var name in textures)
+        {
+            Check(ArtExists(name), "art missing: " + name);
+        }
 
         Check(Resources.Load<Font>("Fonts/PT_Serif-Bold") != null, "PT Serif Bold font exists");
         Check(Resources.Load<Font>("Fonts/PT_Sans-Regular") != null, "PT Sans Regular font exists");
@@ -181,16 +394,35 @@ public static class SelfTest
         Check(Data.Skills.Count > Data.MaxSkillSlots, "more skills than slots");
         Check(Data.Perks.Count >= 15, "enough perk variety");
         Check(Data.RoomCount > 8, "long enough run");
+        Check(Data.Dungeons.Count == 3, "three difficulty tiers");
 
-        var baseStats = new PlayerStats();
-        float playerDps = baseStats.damage / baseStats.attackInterval;
+        var mage = Data.Hero(HeroClass.Mage);
+        var swordsman = Data.Hero(HeroClass.Swordsman);
+        var ranger = Data.Hero(HeroClass.Ranger);
+        float mageDps = mage.Damage / mage.AttackInterval;
+        float swordDps = swordsman.Damage / swordsman.AttackInterval;
+        float rangerDps = ranger.Damage / ranger.AttackInterval;
+
         var imp = Data.Enemy(EnemyKind.Imp);
         var guard = Data.Enemy(EnemyKind.Guard);
+        var executioner = Data.Enemy(EnemyKind.Executioner);
+        var boneKing = Data.Enemy(EnemyKind.BoneKing);
+        var spiderQueen = Data.Enemy(EnemyKind.SpiderQueen);
         var lich = Data.Enemy(EnemyKind.Lich);
-        Check(imp.Hp / playerDps > 1.2f && imp.Hp / playerDps < 3f, "first enemies take a few shots");
+
+        Check(mageDps > 8f && mageDps < 20f, "mage dps in range");
+        Check(swordDps > mageDps && swordDps < 40f, "swordsman deals more dps than mage");
+        Check(rangerDps > 10f && rangerDps < 30f, "ranger dps in range");
+        Check(imp.Hp / mageDps > 1.2f && imp.Hp / mageDps < 3f, "first enemies take a few shots");
         Check(guard.Hp > imp.Hp * 3f, "guard is much tougher than imp");
-        Check(lich.Hp / playerDps > 60f, "boss takes a real fight");
-        Check(Data.Enemy(EnemyKind.Spider).Speed > imp.Speed, "spiders are the fastest basic enemy");
+        Check(executioner.Hp > guard.Hp, "executioner is a late-game threat");
+        Check(lich.Hp / mageDps > 60f, "final boss takes a real fight");
+        Check(boneKing.Hp > executioner.Hp * 4f, "bone king is a boss, not an elite");
+        Check(spiderQueen.Hp > boneKing.Hp, "boss hp grows with difficulty");
+        Check(lich.Hp > spiderQueen.Hp, "final boss is the toughest");
+        Check(Data.Enemy(EnemyKind.Spider).Speed > imp.Speed, "spiders are faster than imps");
+        Check(Data.Enemy(EnemyKind.Hound).Speed > Data.Enemy(EnemyKind.Skeleton).Speed,
+            "hounds are faster than skeletons");
     }
 
     private static bool ArtExists(string name)

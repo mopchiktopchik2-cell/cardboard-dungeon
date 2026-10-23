@@ -10,9 +10,9 @@
 #>
 param(
     [string]$BuildDir = (Join-Path $PSScriptRoot '..\Build'),
-    [string]$OutputZip = (Join-Path $PSScriptRoot '..\CardboardDungeon_v1.1_win64.zip'),
+    [string]$OutputZip = (Join-Path $PSScriptRoot '..\CardboardDungeon_v1.2_win64.zip'),
     [string]$ExeName = 'CardboardDungeon.exe',
-    [string]$Description = 'Cardboard Dungeon v1.1'
+    [string]$Description = 'Cardboard Dungeon v1.2'
 )
 
 $ErrorActionPreference = 'Stop'
