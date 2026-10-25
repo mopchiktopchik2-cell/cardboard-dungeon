@@ -408,7 +408,13 @@ public static partial class Data
 
     public static DungeonDef Dungeon(string id)
     {
-        return Dungeons.Find(d => d.Id == id) ?? Dungeons[0];
+        return FindDungeon(id) ?? Dungeons[0];
+    }
+
+    /// <summary>Возвращает null для неизвестного id, чтобы вызывающий код мог это заметить.</summary>
+    public static DungeonDef FindDungeon(string id)
+    {
+        return string.IsNullOrEmpty(id) ? null : Dungeons.Find(d => d.Id == id);
     }
 
     public static DungeonDef Dungeon(int index)

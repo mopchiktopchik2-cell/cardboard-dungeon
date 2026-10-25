@@ -41,6 +41,7 @@ public class Player : MonoBehaviour
     public float DashCooldown = 1.35f;
     public bool Dead;
     public bool QaInvincible;
+    public bool VictoryLocked;
     public bool Control = true;
     public float PoisonTimer;
     public float PoisonDps;
@@ -103,6 +104,8 @@ public class Player : MonoBehaviour
         Invuln = 0f;
         DashCd = 0f;
         Dead = false;
+        VictoryLocked = false;
+        dashing = false;
         Control = true;
         PoisonTimer = 0f;
         RageTimer = 0f;
@@ -155,6 +158,7 @@ public class Player : MonoBehaviour
         Visual.SetScale(1f);
         Visual.Walking = false;
         Dead = false;
+        dashing = false;
         Invuln = Mathf.Max(Invuln, 0.35f);
         gameObject.SetActive(true);
     }
@@ -185,7 +189,15 @@ public class Player : MonoBehaviour
         ShadowRunTimer = 0f;
         shadowTrailTimer = 0f;
         Invuln = 0.4f;
+        VictoryLocked = false;
+        dashing = false;
         if (Skills != null) Skills.ResetCooldowns();
+    }
+
+    public void LockVictory()
+    {
+        VictoryLocked = true;
+        Invuln = Mathf.Max(Invuln, 2f);
     }
 
     private void Update()
@@ -419,14 +431,16 @@ public class Player : MonoBehaviour
     public void TakeDamage(float amount, Vector2 source, bool ignoreInvuln = false, bool isDot = false,
         Enemy attacker = null)
     {
-        if (Dead) return;
+        if (Dead || VictoryLocked) return;
         if (QaInvincible) return;
         if (!ignoreInvuln && Invuln > 0f) return;
         amount *= 1f - Mathf.Clamp(Stats.damageReduction, 0f, 0.7f);
 
+        // Шипы — ответный урон, а не удар игрока: не даём им
+        // накручивать DamageDealt и лечить через вампиризм.
         if (Stats.thorns > 0f && attacker != null && !attacker.Dead)
         {
-            attacker.TakeDamage(Stats.thorns, transform.position, true, false);
+            attacker.TakeDamage(Stats.thorns, transform.position, false, false);
         }
 
         if (Shield > 0f)
@@ -591,6 +605,7 @@ public class Player : MonoBehaviour
         Dead = true;
         Control = false;
         Stats.hp = 0f;
+        dashing = false;
         if (dashRoutine != null) StopCoroutine(dashRoutine);
         dashRoutine = null;
         Vector2 dir = (Vector2)transform.position - source;

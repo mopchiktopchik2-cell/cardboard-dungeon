@@ -4,6 +4,7 @@ using UnityEngine;
 public class Fx : MonoBehaviour
 {
     private Art art;
+    private Material lineMaterial;
 
     public void Init()
     {
@@ -165,7 +166,12 @@ public class Fx : MonoBehaviour
         lr.SetPosition(1, b);
         lr.startWidth = width;
         lr.endWidth = width * 0.4f;
-        lr.material = new Material(Shader.Find("Sprites/Default"));
+        if (lineMaterial == null)
+        {
+            lineMaterial = new Material(Shader.Find("Sprites/Default"));
+            lineMaterial.name = "Cardboard Fx Line";
+        }
+        lr.sharedMaterial = lineMaterial;
         lr.startColor = color;
         lr.endColor = new Color(color.r, color.g, color.b, 0.2f);
         lr.sortingOrder = 1700;
@@ -186,6 +192,11 @@ public class Fx : MonoBehaviour
         go.transform.localScale = Vector3.one * (radius * 2f / w);
         var f = go.AddComponent<TelegraphFx>();
         f.Init(sr, duration, radius);
+    }
+
+    private void OnDestroy()
+    {
+        if (lineMaterial != null) Destroy(lineMaterial);
     }
 }
 

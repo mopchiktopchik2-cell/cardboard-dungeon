@@ -24,7 +24,12 @@ public class RoomManager : MonoBehaviour
     public bool Cleared;
     public bool BossDead;
 
+    /// <summary>Меняется при сносе комнаты, чтобы старые корутины не трогали новый бой.</summary>
+    public int CombatToken { get; private set; }
+
     private Coroutine waveRoutine;
+    private Coroutine nextWaveRoutine;
+    private Coroutine victoryRoutine;
     private Transform doorLeaf;
     private SpriteRenderer doorLight;
     private bool openingDoor;
@@ -286,13 +291,14 @@ public class RoomManager : MonoBehaviour
             new Vector2(-2.4f, 3.3f), new Vector2(2.4f, -3.3f),
             new Vector2(-0.7f, 3.5f), new Vector2(0.9f, -3.5f)
         };
-        var used = new List<int>();
+        var available = new List<int>();
+        for (int i = 0; i < spots.Length; i++) available.Add(i);
         int count = Mathf.Clamp(theme.PropCount + (boss ? -1 : 0), 2, spots.Length);
-        for (int i = 0; i < count && theme.Props.Length > 0; i++)
+        for (int i = 0; i < count && theme.Props.Length > 0 && available.Count > 0; i++)
         {
-            int si = rng.Next(0, spots.Length);
-            if (used.Contains(si)) continue;
-            used.Add(si);
+            int slot = rng.Next(0, available.Count);
+            int si = available[slot];
+            available.RemoveAt(slot);
             string name = theme.Props[i % theme.Props.Length];
             float scale = 0.85f + (float)rng.NextDouble() * 0.35f;
             float obstacle = PropRadius(name);
@@ -445,7 +451,8 @@ public class RoomManager : MonoBehaviour
 
     public void StartWaveIfNeeded()
     {
-        if (CurrentRoom == null) return;
+        if (CurrentRoom == null || Game.I == null || Game.I.State != GameState.Combat) return;
+        if (BossDead) return;
         if (CurrentRoom.Type == RoomType.Boss)
         {
             if (WaveIndex == 0)
@@ -464,30 +471,38 @@ public class RoomManager : MonoBehaviour
                       (Game.I.Run.RoomIndex + WaveIndex) % 2 == 0);
         WaveIndex++;
         if (waveRoutine != null) StopCoroutine(waveRoutine);
-        waveRoutine = StartCoroutine(SpawnRoutine(comp, elite));
+        waveRoutine = StartCoroutine(SpawnRoutine(comp, elite, CombatToken, Game.I.Run.RunId, Game.I.Run.RoomIndex));
     }
 
     public void SpawnWave()
     {
-        if (WaveSpawning) return;
+        if (WaveSpawning || BossDead) return;
         StartWaveIfNeeded();
     }
 
-    private IEnumerator SpawnRoutine(List<EnemyKind> comp, bool eliteFirst)
+    private IEnumerator SpawnRoutine(List<EnemyKind> comp, bool eliteFirst, int token, int runId, int roomIndex)
     {
         WaveSpawning = true;
         for (int i = 0; i < comp.Count; i++)
         {
+            if (!IsCombatValid(token, runId, roomIndex))
+            {
+                WaveSpawning = false;
+                waveRoutine = null;
+                yield break;
+            }
             Vector2 pos = PickSpawn();
             SpawnOne(comp[i], eliteFirst && i == 0, pos);
             yield return new WaitForSeconds(0.11f);
         }
         WaveSpawning = false;
-        CheckClear();
+        waveRoutine = null;
+        if (IsCombatValid(token, runId, roomIndex)) CheckClear();
     }
 
     private void SpawnOne(EnemyKind kind, bool elite, Vector2 pos)
     {
+        if (BossDead || Game.I == null || Game.I.State != GameState.Combat) return;
         var e = Enemy.Spawn(kind, pos, Game.I.Run.EnemyHpScale, Game.I.Run.EnemyDamageScale, elite);
         Enemies.Add(e);
         if (e.Boss)
@@ -498,6 +513,7 @@ public class RoomManager : MonoBehaviour
 
     public void SpawnAdds(int count)
     {
+        if (BossDead || Game.I == null || Game.I.State != GameState.Combat) return;
         var dungeon = CurrentDungeon ?? Game.I.Run.Dungeon;
         EnemyKind[] adds = dungeon != null && dungeon.Adds != null && dungeon.Adds.Length > 0
             ? dungeon.Adds
@@ -509,8 +525,7 @@ public class RoomManager : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             EnemyKind kind = adds[i % adds.Length];
-            Vector2 pos = new Vector2(3.2f + Random.Range(-2.5f, 2.5f), Random.Range(-2.5f, 2.5f));
-            SpawnOne(kind, false, Clamp(pos, 0.6f));
+            SpawnOne(kind, false, PickSpawnNear(new Vector2(3.2f, 0f), 2.5f));
         }
     }
 
@@ -547,15 +562,67 @@ public class RoomManager : MonoBehaviour
             float x = Random.Range(0.5f, 7.6f);
             float y = Random.Range(-3.6f, 3.6f);
             Vector2 p = new Vector2(x, y);
-            if (Vector2.Distance(p, Game.I.Player.transform.position) < 2.6f) continue;
-            bool bad = false;
-            foreach (var o in Obstacles)
-            {
-                if (Vector2.Distance(p, o.Pos) < o.Radius + 0.6f) { bad = true; break; }
-            }
-            if (!bad) return p;
+            if (IsSpawnPointSafe(p, 2.6f)) return p;
         }
-        return new Vector2(Random.Range(2f, 6f), Random.Range(-2f, 2f));
+
+        // Резервные точки у краёв арены. Если и они заняты, выбираем самую
+        // далёкую от игрока безопасную точку, а не случайную внутри декора.
+        Vector2[] fallback =
+        {
+            new Vector2(6.8f, 3.2f), new Vector2(6.8f, -3.2f),
+            new Vector2(3.4f, 3.2f), new Vector2(3.4f, -3.2f),
+            new Vector2(-2.6f, 3.2f), new Vector2(-2.6f, -3.2f)
+        };
+        Vector2 best = Clamp(fallback[0], 0.6f);
+        float bestScore = float.MinValue;
+        foreach (var raw in fallback)
+        {
+            Vector2 p = Clamp(raw, 0.6f);
+            if (IsSpawnPointSafe(p, 0f)) return p;
+            float score = PlayerDistance(p);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = p;
+            }
+        }
+        return best;
+    }
+
+    private Vector2 PickSpawnNear(Vector2 center, float range)
+    {
+        for (int tries = 0; tries < 16; tries++)
+        {
+            Vector2 p = center + Random.insideUnitCircle * range;
+            p = Clamp(p, 0.6f);
+            if (IsSpawnPointSafe(p, 2.2f)) return p;
+        }
+        return PickSpawn();
+    }
+
+    private bool IsSpawnPointSafe(Vector2 p, float minPlayerDistance)
+    {
+        p = Clamp(p, 0.6f);
+        if (PlayerDistance(p) < minPlayerDistance) return false;
+        for (int i = 0; i < Obstacles.Count; i++)
+        {
+            var o = Obstacles[i];
+            if (Vector2.Distance(p, o.Pos) < o.Radius + 0.6f) return false;
+        }
+        return true;
+    }
+
+    private static float PlayerDistance(Vector2 p)
+    {
+        if (Game.I == null || Game.I.Player == null) return float.MaxValue;
+        return Vector2.Distance(p, Game.I.Player.transform.position);
+    }
+
+    private bool IsCombatValid(int token, int runId, int roomIndex)
+    {
+        return Game.I != null && Game.I.State == GameState.Combat &&
+               token == CombatToken && !BossDead &&
+               Game.I.Run != null && Game.I.Run.RunId == runId && Game.I.Run.RoomIndex == roomIndex;
     }
 
     public void NotifyKilled(Enemy enemy)
@@ -572,22 +639,29 @@ public class RoomManager : MonoBehaviour
     private void CheckClear()
     {
         if (Cleared || WaveSpawning || BossDead) return;
+        if (Game.I == null || Game.I.State != GameState.Combat) return;
         if (Enemies.Count > 0) return;
         if (CurrentRoom == null) return;
         if (WaveIndex < CurrentRoom.Waves)
         {
-            StartCoroutine(NextWaveRoutine());
+            if (nextWaveRoutine == null)
+            {
+                nextWaveRoutine = StartCoroutine(NextWaveRoutine(CombatToken, Game.I.Run.RunId,
+                    Game.I.Run.RoomIndex));
+            }
             return;
         }
         Cleared = true;
         Game.I.OnRoomCleared();
     }
 
-    private IEnumerator NextWaveRoutine()
+    private IEnumerator NextWaveRoutine(int token, int runId, int roomIndex)
     {
         Game.I.UI.ShowBanner("ВОЛНА " + (WaveIndex + 1), "Они вылезают из-под пола", 1.1f, Pal.Red);
         Game.I.Audio.Play("sfx_spawn", 0.6f);
         yield return new WaitForSeconds(1.0f);
+        nextWaveRoutine = null;
+        if (!IsCombatValid(token, runId, roomIndex)) yield break;
         SpawnWave();
     }
 
@@ -596,20 +670,62 @@ public class RoomManager : MonoBehaviour
         if (BossDead) return;
         BossDead = true;
         Cleared = true;
-        Projectile.ClearAll();
+
+        // Волны и старые отложенные победы больше не должны выполняться.
+        if (waveRoutine != null)
+        {
+            StopCoroutine(waveRoutine);
+            waveRoutine = null;
+        }
+        if (nextWaveRoutine != null)
+        {
+            StopCoroutine(nextWaveRoutine);
+            nextWaveRoutine = null;
+        }
+        WaveSpawning = false;
+        ClearCombatDangers();
+
+        // Аддов убираем без урона: иначе 9999 урона раздувает статистику и
+        // полностью лечит игрока через вампиризм.
         var copy = new List<Enemy>(Enemies);
         foreach (var e in copy)
         {
-            if (e != null && !e.Dead) e.TakeDamage(9999f, e.transform.position, true, false);
+            if (e != null && !e.Dead) e.DespawnSilently();
         }
+        Enemies.Clear();
+
         Game.I.UI.ShowBossBar(false);
-        StartCoroutine(BossVictoryRoutine());
+
+        // Если игрок уже погиб, победа не должна перебивать поражение.
+        if (Game.I.Player == null || Game.I.Player.Dead || Game.I.State != GameState.Combat) return;
+
+        Game.I.Player.LockVictory();
+        victoryRoutine = StartCoroutine(BossVictoryRoutine(Game.I.Run.RunId, CombatToken,
+            Game.I.Run.RoomIndex));
     }
 
-    private IEnumerator BossVictoryRoutine()
+    private IEnumerator BossVictoryRoutine(int runId, int token, int roomIndex)
     {
         yield return new WaitForSeconds(1.4f);
+
+        bool valid = Game.I != null && Game.I.State == GameState.Combat &&
+                     BossDead && Cleared && !Game.I.Player.Dead &&
+                     Game.I.Run != null && Game.I.Run.RunId == runId &&
+                     Game.I.Run.RoomIndex == roomIndex &&
+                     CombatToken == token && CurrentRoom != null &&
+                     CurrentRoom.Type == RoomType.Boss;
+        victoryRoutine = null;
+        if (!valid) yield break;
         Game.I.Victory();
+    }
+
+    public void CancelPendingVictory()
+    {
+        if (victoryRoutine != null)
+        {
+            StopCoroutine(victoryRoutine);
+            victoryRoutine = null;
+        }
     }
 
     public void CloseCombat()
@@ -619,7 +735,27 @@ public class RoomManager : MonoBehaviour
             StopCoroutine(waveRoutine);
             waveRoutine = null;
         }
+        if (nextWaveRoutine != null)
+        {
+            StopCoroutine(nextWaveRoutine);
+            nextWaveRoutine = null;
+        }
+        CancelPendingVictory();
         WaveSpawning = false;
+        ClearCombatDangers();
+    }
+
+    private void ClearCombatDangers()
+    {
+        Projectile.ClearAll();
+        foreach (var h in FindObjectsOfType<Hazard>())
+        {
+            if (h != null) h.Defuse();
+        }
+        foreach (var t in FindObjectsOfType<TelegraphFx>())
+        {
+            if (t != null) Destroy(t.gameObject);
+        }
     }
 
     public void OpenDoor()
@@ -737,6 +873,33 @@ public class RoomManager : MonoBehaviour
         return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
     }
 
+    /// <summary>Проверяет, пересекает ли отрезок какое-либо препятствие.</summary>
+    public bool SegmentBlocked(Vector2 from, Vector2 to, float radius)
+    {
+        for (int i = 0; i < Obstacles.Count; i++)
+        {
+            var o = Obstacles[i];
+            if (SegmentCircleDistance(from, to, o.Pos) < o.Radius + radius) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Прямая видимость цели без учёта других врагов.</summary>
+    public bool HasLineOfSight(Vector2 from, Vector2 to, float clearance = 0.05f)
+    {
+        return !SegmentBlocked(from, to, clearance);
+    }
+
+    private static float SegmentCircleDistance(Vector2 a, Vector2 b, Vector2 center)
+    {
+        Vector2 ab = b - a;
+        float lenSq = ab.sqrMagnitude;
+        if (lenSq < 0.000001f) return Vector2.Distance(a, center);
+        float t = Mathf.Clamp01(Vector2.Dot(center - a, ab) / lenSq);
+        Vector2 nearest = a + ab * t;
+        return Vector2.Distance(nearest, center);
+    }
+
     public Vector2 Clamp(Vector2 p, float radius)
     {
         p.x = Mathf.Clamp(p.x, Arena.xMin + radius, Arena.xMax - radius);
@@ -817,6 +980,10 @@ public class RoomManager : MonoBehaviour
 
     private void ClearRoom()
     {
+        CombatToken++;
+        BossDead = false;
+        Cleared = false;
+        WaveIndex = 0;
         CloseCombat();
         if (doorRoutine != null)
         {

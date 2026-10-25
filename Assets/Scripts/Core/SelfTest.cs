@@ -20,6 +20,7 @@ public static class SelfTest
         CheckPerks();
         CheckClasses();
         CheckDungeons();
+        CheckSettings();
         CheckEnemies();
         CheckRooms();
         CheckEquipment();
@@ -202,12 +203,22 @@ public static class SelfTest
             lastTier = d.LootTier;
         }
 
+        Check(Data.FindDungeon("crypt") != null, "find dungeon by known id");
+        Check(Data.FindDungeon("missing_dungeon") == null, "find dungeon rejects unknown id");
+        Check(Data.Dungeon("missing_dungeon").Id == "crypt", "unknown dungeon falls back to crypt");
         Check(Data.Dungeon("crypt").Difficulty == DungeonDifficulty.Easy, "crypt is easy");
         Check(Data.Dungeon("web").Difficulty == DungeonDifficulty.Medium, "web is medium");
         Check(Data.Dungeon("throne").Difficulty == DungeonDifficulty.Hard, "throne is hard");
         Check(Mathf.Abs(Data.Dungeons[0].DropChance - 0.45f) < 0.001f, "easy drop chance is 45%");
         Check(Mathf.Abs(Data.Dungeons[1].DropChance - 0.65f) < 0.001f, "medium drop chance is 65%");
         Check(Mathf.Abs(Data.Dungeons[2].DropChance - 0.85f) < 0.001f, "hard drop chance is 85%");
+    }
+
+    private static void CheckSettings()
+    {
+        Check(ScreenSettings.Resolutions.Length == 3, "three screen resolutions");
+        Check(ScreenSettings.FpsNames.Length == 4, "four frame-rate modes");
+        Check(ScreenSettings.ResolutionName(0) == "1280×720", "resolution label uses width×height");
     }
 
     private static void CheckEnemies()

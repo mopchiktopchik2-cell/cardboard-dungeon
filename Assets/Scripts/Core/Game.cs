@@ -36,6 +36,8 @@ public class Game : MonoBehaviour
 
     private Coroutine flow;
     private Coroutine hitstop;
+    private int auditPassed;
+    private int auditFailed;
 
     public bool InputLocked => State != GameState.Combat;
     public bool InRun => State == GameState.Intro || State == GameState.Combat || State == GameState.Clear ||
@@ -51,8 +53,12 @@ public class Game : MonoBehaviour
         I = this;
         DontDestroyOnLoad(gameObject);
         QA = HasArg("-qa");
-        Application.targetFrameRate = 60;
-        QualitySettings.vSyncCount = 0;
+        if (!QA || HasArg("-qaSettings")) ScreenSettings.ApplySaved();
+        else
+        {
+            Application.targetFrameRate = 60;
+            QualitySettings.vSyncCount = 0;
+        }
         Physics2D.queriesHitTriggers = false;
 
         Art = new Art();
@@ -86,6 +92,9 @@ public class Game : MonoBehaviour
         Debug.Log("[Cardboard] Boot complete");
         ToMenu();
         if (QA && HasArg("-qaEquip")) StartCoroutine(QaEquipShot());
+        else if (QA && HasArg("-qaSettingsShot")) StartCoroutine(QaSettingsShot());
+        else if (QA && HasArg("-qaBossAttacks")) StartCoroutine(QaBossAttacks());
+        else if (QA && HasArg("-qaAudit")) StartCoroutine(QaAudit());
         else if (QA && HasArg("-qaTour")) StartCoroutine(QaTour());
     }
 
@@ -281,10 +290,183 @@ public class Game : MonoBehaviour
         Application.Quit();
     }
 
+    private IEnumerator QaSettingsShot()
+    {
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+        yield return new WaitForSecondsRealtime(0.8f);
+        UI.ShowSettings();
+        yield return new WaitForSecondsRealtime(0.8f);
+        yield return QaShot(shotsDir, "settings");
+        Application.Quit();
+    }
+
+    private IEnumerator QaBossAttacks()
+    {
+        Player.QaInvincible = true;
+        string[] dungeons = { "crypt", "web", "throne" };
+        int started = 0;
+        foreach (string id in dungeons)
+        {
+            MetaProgress.SelectedDungeonId = id;
+            MetaProgress.SelectedClass = HeroClass.Mage;
+            StartRun();
+            yield return QaWaitFor(() => State == GameState.Combat, 4f);
+            yield return QaEnterBoss();
+            Enemy boss = Rooms.Enemies.Find(e => e != null && e.Boss);
+            if (boss == null)
+            {
+                Debug.LogError("[QaBossAttacks] boss missing: " + id);
+                break;
+            }
+            boss.MaxHp = 999999f;
+            boss.Hp = boss.MaxHp;
+            for (int which = 0; which < 6; which++)
+            {
+                if (!boss.QaCastAttack(which))
+                {
+                    Debug.LogError("[QaBossAttacks] cast failed: " + id + " pattern=" + which);
+                    continue;
+                }
+                started++;
+                yield return QaWaitFor(() => !boss.QaCasting, 3f);
+                yield return new WaitForSecondsRealtime(0.25f);
+            }
+            Debug.Log("[QaBossAttacks] " + id + " done");
+        }
+        Debug.Log("[QaBossAttacks] started=" + started + " expected=18");
+        yield return new WaitForSecondsRealtime(0.3f);
+        Application.Quit();
+    }
+
+    private IEnumerator QaAudit()
+    {
+        Player.QaInvincible = false;
+        MetaProgress.SelectedDungeonId = "crypt";
+        MetaProgress.SelectedClass = HeroClass.Mage;
+        yield return new WaitForSecondsRealtime(0.2f);
+
+        // 1. Обычный старт и DoT: яд должен пробивать неуязвимость,
+        // но не превращаться в обычный удар.
+        StartRun();
+        yield return QaWaitFor(() => State == GameState.Combat, 4f);
+        AuditCheck("run starts in combat", State == GameState.Combat);
+        float hpBeforeDot = Player.Stats.hp;
+        Player.Invuln = 1f;
+        Player.TakeDamage(5f, Player.transform.position, true, true);
+        AuditCheck("poison tick ignores invulnerability", Player.Stats.hp < hpBeforeDot);
+        Player.Invuln = 0f;
+        Player.Heal(9999f);
+
+        // 2. Босс убит, но забег перезапускают до конца задержки победы.
+        yield return QaEnterBoss();
+        AuditCheck("boss spawned", Rooms.Enemies.Exists(e => e != null && e.Boss));
+        Hazard.Poison(Player.transform.position, 1.5f, 5f, 5f, false);
+        Projectile.Enemy((Vector2)Player.transform.position + Vector2.up * 2.5f, Vector2.down, 1f, 1f, "proj_arrow");
+        Rooms.KillAllEnemies();
+        yield return QaWaitFor(() => Rooms.BossDead, 1f);
+        AudCheckBossPending();
+        PauseGame();
+        AuditCheck("pause blocked after boss death", State == GameState.Combat);
+        float hpAfterLock = Player.Stats.hp;
+        Player.TakeDamage(9999f, Player.transform.position, true, true);
+        AuditCheck("boss victory lock blocks damage", Mathf.Approximately(hpAfterLock, Player.Stats.hp));
+        yield return new WaitForSecondsRealtime(0.12f);
+        AuditCheck("boss death clears projectiles and hazards",
+            FindObjectsOfType<Projectile>().Length == 0 && FindObjectsOfType<Hazard>().Length == 0);
+        RestartRun();
+        yield return new WaitForSecondsRealtime(1.9f);
+        AuditCheck("restart cancels pending boss victory",
+            State != GameState.Victory && Run.RoomIndex == 0 && !Rooms.BossDead);
+
+        // 3. Босс убит, но игрок уходит в меню до конца задержки.
+        yield return QaWaitFor(() => State == GameState.Combat, 4f);
+        yield return QaEnterBoss();
+        Rooms.KillAllEnemies();
+        yield return QaWaitFor(() => Rooms.BossDead, 1f);
+        ToMenu();
+        yield return new WaitForSecondsRealtime(1.9f);
+        AuditCheck("menu cancels pending boss victory", State == GameState.Menu);
+
+        // 4. Если игрок погиб раньше босса, победа не должна перебить поражение.
+        StartRun();
+        yield return QaWaitFor(() => State == GameState.Combat, 4f);
+        yield return QaEnterBoss();
+        Player.Invuln = 0f;
+        Player.TakeDamage(99999f, Player.transform.position, true, true);
+        Rooms.KillAllEnemies();
+        yield return new WaitForSecondsRealtime(1.25f);
+        AuditCheck("death before boss death stays defeat", State == GameState.Dead);
+
+        // 5. Штатная победа всё ещё работает и не ломается новыми проверками.
+        RestartRun();
+        yield return QaWaitFor(() => State == GameState.Combat, 4f);
+        yield return QaEnterBoss();
+        Rooms.KillAllEnemies();
+        yield return QaWaitFor(() => Rooms.BossDead, 1f);
+        yield return new WaitForSecondsRealtime(2.0f);
+        AuditCheck("normal boss victory still completes", State == GameState.Victory);
+
+        Debug.Log("[QaAudit] passed=" + auditPassed + " failed=" + auditFailed);
+        yield return new WaitForSecondsRealtime(0.3f);
+        Application.Quit();
+    }
+
+    private void AudCheckBossPending()
+    {
+        AuditCheck("boss victory is pending", Rooms.BossDead && State == GameState.Combat && Player.VictoryLocked);
+    }
+
+    private void AuditCheck(string name, bool ok)
+    {
+        if (ok)
+        {
+            auditPassed++;
+            Debug.Log("[QaAudit] PASS " + name);
+        }
+        else
+        {
+            auditFailed++;
+            Debug.LogError("[QaAudit] FAIL " + name);
+        }
+    }
+
+    private IEnumerator QaWaitFor(System.Func<bool> condition, float timeout)
+    {
+        float left = timeout;
+        while (!condition() && left > 0f)
+        {
+            left -= Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    private IEnumerator QaEnterBoss()
+    {
+        StopFlow();
+        int index = Run.RoomCount - 1;
+        Run.RoomIndex = index;
+        Rooms.BuildRoom(index, false);
+        Player.RevivePosition(Rooms.PlayerSpawn);
+        Player.SetVisible(true);
+        Player.OnRoomStart();
+        State = GameState.Combat;
+        Transitioning = false;
+        UI.RefreshRoom();
+        Rooms.SpawnWave();
+        yield return new WaitForSecondsRealtime(0.5f);
+        yield return QaWaitFor(() => Rooms.Enemies.Count > 0, 1f);
+    }
+
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            if (UI.SettingsOpen)
+            {
+                UI.HideSettings();
+                return;
+            }
             if (State == GameState.Combat) PauseGame();
             else if (State == GameState.Pause) ResumeGame();
         }
@@ -350,6 +532,7 @@ public class Game : MonoBehaviour
     public void ToMenu()
     {
         StopFlow();
+        if (Rooms != null) Rooms.CancelPendingVictory();
         Time.timeScale = 1f;
         State = GameState.Menu;
         Transitioning = false;
@@ -377,6 +560,7 @@ public class Game : MonoBehaviour
             return;
         }
         StopFlow();
+        if (Rooms != null) Rooms.CancelPendingVictory();
         Time.timeScale = 1f;
         UI.HideMenu();
         UI.HideEnd();
@@ -406,6 +590,7 @@ public class Game : MonoBehaviour
     public void RestartRun()
     {
         StopFlow();
+        if (Rooms != null) Rooms.CancelPendingVictory();
         Time.timeScale = 1f;
         UI.HideEnd();
         UI.HidePause();
@@ -462,6 +647,7 @@ public class Game : MonoBehaviour
     {
         if (State != GameState.Combat) return;
         State = GameState.Clear;
+        Rooms.CloseCombat();
         Run.OnRoomCleared();
         UI.ShowBanner("КОМНАТА ЗАЧИЩЕНА", Player.Stats.roomHeal > 0 ? "Передышка восстановила силы" : "Пора идти дальше", 1.2f, Pal.Gold);
         flow = StartCoroutine(ClearRoutine());
@@ -472,11 +658,6 @@ public class Game : MonoBehaviour
         yield return WaitReal(1.1f);
         if (State != GameState.Clear || Player == null || Player.Dead)
         {
-            yield break;
-        }
-        if (Run.RoomIndex >= Run.RoomCount - 1)
-        {
-            Victory();
             yield break;
         }
         OfferPerks("ВЫБЕРИ ПЕРК");
@@ -556,9 +737,16 @@ public class Game : MonoBehaviour
 
     public void ShowTreasure()
     {
+        var perks = Run.RollPerks(3);
+        if (perks.Count == 0)
+        {
+            // Пустая сокровищница не должна оставлять игру в состоянии Perk.
+            ContinueAfterChoice();
+            return;
+        }
         State = GameState.Perk;
         Time.timeScale = 0f;
-        UI.ShowTreasure(Run.RollPerks(3));
+        UI.ShowTreasure(perks);
         Audio.Play("sfx_pickup", 0.8f);
     }
 
@@ -639,6 +827,7 @@ public class Game : MonoBehaviour
     public void PauseGame()
     {
         if (State != GameState.Combat) return;
+        if (Rooms != null && Rooms.BossDead) return;
         State = GameState.Pause;
         Time.timeScale = 0f;
         UI.ShowPause();
@@ -656,7 +845,8 @@ public class Game : MonoBehaviour
 
     public void Victory()
     {
-        if (State == GameState.Dead || State == GameState.Victory) return;
+        if (State != GameState.Combat || Rooms == null || !Rooms.BossDead || !Rooms.Cleared) return;
+        if (Player == null || Player.Dead) return;
         StopFlow();
         State = GameState.Victory;
         Time.timeScale = 0f;
@@ -672,6 +862,11 @@ public class Game : MonoBehaviour
     {
         if (State == GameState.Dead || State == GameState.Victory) return;
         StopFlow();
+        if (Rooms != null)
+        {
+            Rooms.CancelPendingVictory();
+            Rooms.CloseCombat();
+        }
         State = GameState.Dead;
         Time.timeScale = 0f;
         UI.ShowBossBar(false);

@@ -88,15 +88,31 @@ public class Projectile : MonoBehaviour
 
     public static void ClearAll()
     {
-        for (int i = All.Count - 1; i >= 0; i--)
-        {
-            if (All[i] != null) Destroy(All[i].gameObject);
-        }
+        var copy = new List<Projectile>(All);
         All.Clear();
+        foreach (var projectile in copy)
+        {
+            if (projectile == null) continue;
+            projectile.enabled = false;
+            Destroy(projectile.gameObject);
+        }
     }
 
     private void Update()
     {
+        if (Game.I == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        if (Game.I.State == GameState.Pause) return;
+        if (Game.I.State != GameState.Combat)
+        {
+            // Не даём снарядам убить игрока после зачистки или во время перехода.
+            Destroy(gameObject);
+            return;
+        }
+
         float dt = Time.deltaTime;
         life -= dt;
         if (life <= 0f)
@@ -120,7 +136,17 @@ public class Projectile : MonoBehaviour
             }
         }
 
-        transform.position += (Vector3)(dir * speed * dt);
+        Vector2 from = transform.position;
+        Vector2 to = from + dir * speed * dt;
+        Rect arena = Game.I.Rooms.Arena;
+        if (to.x < arena.xMin + 0.05f || to.x > arena.xMax - 0.05f ||
+            to.y < arena.yMin + 0.05f || to.y > arena.yMax - 0.05f ||
+            Game.I.Rooms.SegmentBlocked(from, to, radius))
+        {
+            ImpactObstacle();
+            return;
+        }
+        transform.position = to;
         transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
 
         trailTimer -= dt;
@@ -168,6 +194,17 @@ public class Projectile : MonoBehaviour
         {
             Destroy(gameObject);
         }
+    }
+
+    private void ImpactObstacle()
+    {
+        if (Game.I != null && Game.I.Fx != null)
+        {
+            Game.I.Fx.Sprite(spriteName, transform.position, scale * 0.7f, 0.16f,
+                new Color(tint.r, tint.g, tint.b, 0.55f), 1620);
+            Game.I.Audio.Play("sfx_hit", 0.22f, 1.25f);
+        }
+        Destroy(gameObject);
     }
 
     private void HitEnemy(Enemy e)

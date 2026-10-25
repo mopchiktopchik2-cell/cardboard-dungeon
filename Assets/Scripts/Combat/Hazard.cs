@@ -31,6 +31,13 @@ public class Hazard : MonoBehaviour
 
     private bool fromPlayer;
 
+    /// <summary>Немедленно выключает лужу, не дожидаясь Destroy в конце кадра.</summary>
+    public void Defuse()
+    {
+        enabled = false;
+        Destroy(gameObject);
+    }
+
     private void Update()
     {
         if (Game.I == null || Game.I.State != GameState.Combat) return;
@@ -44,7 +51,7 @@ public class Hazard : MonoBehaviour
                 var enemies = Game.I.Rooms.EnemiesInRadius(transform.position, radius);
                 foreach (var e in enemies)
                 {
-                    if (e != null && !e.Dead) e.TakeDamage(dps * 0.45f, transform.position, false, false);
+                    if (e != null && !e.Dead) e.TakeDamage(dps * 0.45f, transform.position, true, false);
                 }
             }
             else
@@ -52,7 +59,7 @@ public class Hazard : MonoBehaviour
                 var p = Game.I.Player;
                 if (p != null && !p.Dead && Vector2.Distance(p.transform.position, transform.position) < radius + 0.3f)
                 {
-                    p.TakeDamage(dps * 0.45f, transform.position, true);
+                    p.TakeDamage(dps * 0.45f, transform.position, true, true);
                     p.Poison(1.2f, 2f);
                 }
             }

@@ -48,6 +48,20 @@ public class Enemy : MonoBehaviour
     private float avoidSign = 1f;
     private float stuckTimer;
     private Vector2 lastPos;
+    private static readonly int[] BossAttackOrder = { 4, 0, 5, 1, 2, 3 };
+
+    public bool QaCasting => casting;
+
+    /// <summary>QA-хук: запускает конкретный паттерн босса, не меняя обычный бой.</summary>
+    public bool QaCastAttack(int which)
+    {
+        if (!Boss || Dead || casting || Game.I == null || Game.I.Player == null) return false;
+        specialCd = 999f;
+        attackCd = 999f;
+        casting = true;
+        StartCoroutine(BossAttack(Game.I.Player, which));
+        return true;
+    }
 
     public static Enemy Spawn(EnemyKind kind, Vector2 pos, float hpScale, float damageScale, bool elite = false)
     {
@@ -83,10 +97,7 @@ public class Enemy : MonoBehaviour
         if (elite) Visual.AddAura(Game.I.Art, Pal.Gold, 1.35f);
         if (Boss)
         {
-            Color aura = kind == EnemyKind.BoneKing ? new Color(0.65f, 1f, 0.7f) :
-                kind == EnemyKind.SpiderQueen ? new Color(1f, 0.35f, 0.65f) :
-                new Color(0.7f, 0.35f, 0.9f);
-            Visual.AddAura(Game.I.Art, aura, 1.6f);
+            Visual.AddAura(Game.I.Art, BossAccent(), 1.6f);
         }
 
         float h = Visual.Main.sprite.bounds.size.y * scale;
@@ -157,7 +168,7 @@ public class Enemy : MonoBehaviour
             if (dotTick <= 0f)
             {
                 dotTick = 0.7f;
-                TakeDamage(dotDps * 0.7f, transform.position, false, false);
+                TakeDamage(dotDps * 0.7f, transform.position, true, false);
                 if (Dead) return;
                 UpdateBar();
             }
@@ -258,6 +269,19 @@ public class Enemy : MonoBehaviour
         return barVisible || Elite;
     }
 
+    private bool CanAct()
+    {
+        return !Dead && Game.I != null && Game.I.State == GameState.Combat;
+    }
+
+    private bool HasLineOfSight(Player player)
+    {
+        if (player == null || Game.I == null || Game.I.Rooms == null) return false;
+        Vector2 from = (Vector2)transform.position + Vector2.up * 0.8f;
+        Vector2 to = (Vector2)player.transform.position + Vector2.up * 0.5f;
+        return Game.I.Rooms.HasLineOfSight(from, to);
+    }
+
     private void ImpAI(Player player, Vector2 dir, float dist, float dt)
     {
         if (specialCd <= 0f && dist < 7.4f)
@@ -279,7 +303,7 @@ public class Enemy : MonoBehaviour
         Visual.Flash(new Color(1f, 0.55f, 0.25f), 0.2f);
         Game.I.Fx.Ring(transform.position, new Color(1f, 0.5f, 0.2f, 0.7f), 0.7f, 0.35f);
         yield return new WaitForSeconds(0.38f);
-        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        if (!CanAct() || !HasLineOfSight(player))
         {
             casting = false;
             yield break;
@@ -352,7 +376,7 @@ public class Enemy : MonoBehaviour
         Visual.Windup(0.42f);
         Visual.Flash(new Color(0.95f, 0.9f, 0.72f), 0.2f);
         yield return new WaitForSeconds(0.42f);
-        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        if (!CanAct() || !HasLineOfSight(player))
         {
             casting = false;
             yield break;
@@ -398,7 +422,7 @@ public class Enemy : MonoBehaviour
             MoveDir(side * (Mathf.Sin(Time.time + transform.position.x) > 0f ? 1f : -1f), 0.55f, dt);
         }
 
-        if (attackCd <= 0f && dist < 7f)
+        if (attackCd <= 0f && dist < 7f && HasLineOfSight(player))
         {
             winding = true;
             windup = 0.36f;
@@ -444,6 +468,12 @@ public class Enemy : MonoBehaviour
         Visual.Attack(aim, 1.6f);
         while (t < 0.52f)
         {
+            if (!CanAct())
+            {
+                Visual.Walking = false;
+                casting = false;
+                yield break;
+            }
             t += Time.deltaTime;
             Vector2 before = transform.position;
             transform.position = Game.I.Rooms.Move(transform.position, aim * 10.8f * Time.deltaTime, radius);
@@ -539,7 +569,7 @@ public class Enemy : MonoBehaviour
         Visual.Windup(0.36f);
         Visual.Flash(new Color(0.75f, 0.9f, 1f), 0.18f);
         yield return new WaitForSeconds(0.36f);
-        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        if (!CanAct() || !HasLineOfSight(player))
         {
             casting = false;
             yield break;
@@ -583,7 +613,7 @@ public class Enemy : MonoBehaviour
             MoveDir(side * (Mathf.Sin(Time.time * 0.7f) > 0f ? 1f : -1f), 0.45f, dt);
         }
 
-        if (attackCd <= 0f && dist < 7.5f)
+        if (attackCd <= 0f && dist < 7.5f && HasLineOfSight(player))
         {
             winding = true;
             windup = 0.48f;
@@ -602,7 +632,7 @@ public class Enemy : MonoBehaviour
         Game.I.Fx.TelegraphedCircle(target, 1.9f, 0.55f, new Color(0.55f, 0.95f, 0.4f));
         Game.I.Audio.Play("sfx_cast", 0.5f, 0.8f);
         yield return new WaitForSeconds(0.55f);
-        if (Dead || Game.I == null || Game.I.State != GameState.Combat)
+        if (!CanAct() || !HasLineOfSight(player))
         {
             casting = false;
             yield break;
@@ -757,6 +787,12 @@ public class Enemy : MonoBehaviour
         const float flight = 0.28f;
         while (t < flight)
         {
+            if (!CanAct())
+            {
+                Visual.Walking = false;
+                casting = false;
+                yield break;
+            }
             t += Time.deltaTime;
             float k = Mathf.Clamp01(t / flight);
             transform.position = Vector2.Lerp(start, target, Mathf.SmoothStep(0f, 1f, k));
@@ -765,11 +801,17 @@ public class Enemy : MonoBehaviour
             if (k > 0.35f && k < 0.7f) Game.I.Fx.Afterimage(Visual.Main);
             yield return null;
         }
+        if (!CanAct())
+        {
+            Visual.Walking = false;
+            casting = false;
+            yield break;
+        }
         transform.position = target;
         Game.I.Fx.Dust(transform.position, 6, 0.9f);
         Game.I.Audio.Play("sfx_hit", 0.45f, 1.35f);
         if (Vector2.Distance(transform.position, player.transform.position) < 1.25f &&
-            player.Invuln <= 0f)
+            player.Invuln <= 0f && !player.Dead)
         {
             player.TakeDamage(Damage * 1.3f, transform.position, false, false, this);
         }
@@ -872,9 +914,7 @@ public class Enemy : MonoBehaviour
         if (!phase2 && Hp < MaxHp * 0.5f)
         {
             phase2 = true;
-            Color phaseTint = Def.Kind == EnemyKind.BoneKing ? new Color(0.7f, 1f, 0.72f) :
-                Def.Kind == EnemyKind.SpiderQueen ? new Color(1f, 0.55f, 0.78f) :
-                new Color(0.9f, 0.62f, 0.85f);
+            Color phaseTint = BossAccent();
             Visual.SetTint(phaseTint);
             baseTint = phaseTint;
             Game.I.Fx.Explosion(transform.position, 2.2f, phaseTint);
@@ -897,7 +937,8 @@ public class Enemy : MonoBehaviour
         if (specialCd <= 0f)
         {
             specialCd = phase2 ? 2.1f : 2.9f;
-            StartCoroutine(BossAttack(player, pattern++ % 4));
+            int which = BossAttackOrder[pattern++ % BossAttackOrder.Length];
+            StartCoroutine(BossAttack(player, which));
         }
     }
 
@@ -908,11 +949,36 @@ public class Enemy : MonoBehaviour
         Vector2 castDir = ((Vector2)player.transform.position - (Vector2)transform.position).normalized;
         Visual.Face(castDir.x);
         Visual.Windup(0.45f);
-        Game.I.Fx.Ring(transform.position, new Color(0.7f, 0.4f, 0.9f, 0.7f), 1.6f, 0.35f);
+        Color accent = BossAccent();
+        Game.I.Fx.Ring(transform.position, new Color(accent.r, accent.g, accent.b, 0.7f), 1.6f, 0.35f);
+        if (Game.I.QA) Debug.Log("[BossAttack] " + Def.Kind + " pattern=" + which);
+
+        if (which >= 4)
+        {
+            yield return BossSignature(player, which);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
+            yield return new WaitForSeconds(0.22f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
+            casting = false;
+            yield break;
+        }
 
         if (which == 0)
         {
             yield return new WaitForSeconds(0.5f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
             Visual.Attack(castDir, 1f);
             int count = phase2 ? 14 : 9;
             for (int i = 0; i < count; i++)
@@ -927,6 +993,11 @@ public class Enemy : MonoBehaviour
         else if (which == 1)
         {
             yield return new WaitForSeconds(0.55f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
             Visual.Attack(castDir, 0.8f);
             int adds = phase2 ? 3 : 2;
             Game.I.Rooms.SpawnAdds(adds);
@@ -936,6 +1007,11 @@ public class Enemy : MonoBehaviour
         else if (which == 2)
         {
             yield return new WaitForSeconds(0.45f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
             Visual.Attack(castDir, 1f);
             int count = phase2 ? 5 : 4;
             for (int i = 0; i < count; i++)
@@ -943,7 +1019,7 @@ public class Enemy : MonoBehaviour
                 Vector2 p = (Vector2)player.transform.position + Random.insideUnitCircle * 3.2f;
                 p = Game.I.Rooms.Clamp(p, 0.6f);
                 Game.I.Fx.TelegraphedCircle(p, 1.5f, 1.15f, new Color(1f, 0.35f, 0.3f));
-                Game.I.Rooms.StartCoroutine(MeteorAt(p, 1.15f, Damage * 1.2f));
+                StartCoroutine(MeteorAt(p, 1.15f, Damage * 1.2f));
             }
             Game.I.Audio.Play("sfx_wave", 0.5f);
         }
@@ -952,12 +1028,22 @@ public class Enemy : MonoBehaviour
             Vector2 target = Game.I.Rooms.RandomArenaPoint(2f);
             Visual.SetVisible(false);
             yield return new WaitForSeconds(0.35f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
             transform.position = target;
             Visual.SetVisible(true);
             Visual.SpawnPop(0.35f);
             Game.I.Fx.Explosion(target, 1.3f, new Color(0.7f, 0.4f, 0.95f));
             Game.I.Audio.Play("sfx_dash", 0.7f);
             yield return new WaitForSeconds(0.3f);
+            if (!CanAct())
+            {
+                casting = false;
+                yield break;
+            }
             int count = phase2 ? 10 : 7;
             for (int i = 0; i < count; i++)
             {
@@ -968,17 +1054,244 @@ public class Enemy : MonoBehaviour
         }
 
         yield return new WaitForSeconds(0.25f);
+        if (!CanAct())
+        {
+            casting = false;
+            yield break;
+        }
         casting = false;
+    }
+
+    private Color BossAccent()
+    {
+        switch (Def.Kind)
+        {
+            case EnemyKind.BoneKing: return new Color(0.7f, 1f, 0.72f);
+            case EnemyKind.SpiderQueen: return new Color(1f, 0.55f, 0.78f);
+            default: return new Color(0.9f, 0.62f, 0.85f);
+        }
+    }
+
+    private IEnumerator BossSignature(Player player, int which)
+    {
+        if (Def.Kind == EnemyKind.BoneKing)
+        {
+            if (which == 4) yield return BossBoneFan(player);
+            else yield return BossRoyalCharge(player);
+            yield break;
+        }
+        if (Def.Kind == EnemyKind.SpiderQueen)
+        {
+            if (which == 4) yield return BossVenomFan(player);
+            else yield return BossWebTrap(player);
+            yield break;
+        }
+        if (which == 4) yield return BossSoulSpiral(player);
+        else yield return BossSoulLance(player);
+    }
+
+    private IEnumerator BossBoneFan(Player player)
+    {
+        yield return new WaitForSeconds(0.28f);
+        if (!CanAct()) yield break;
+
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.9f;
+        Vector2 aim = ((Vector2)player.transform.position + Vector2.up * 0.5f - origin).normalized;
+        int count = phase2 ? 7 : 5;
+        const float step = 9f;
+        for (int i = 0; i < count; i++)
+        {
+            float offset = (i - (count - 1) * 0.5f) * step;
+            Projectile.Enemy(origin, Rotate(aim, offset), Damage * 0.8f, 9.8f,
+                Def.Projectile, 1.3f, 0.27f, 5f);
+        }
+        Visual.Attack(aim, 1.2f);
+        Game.I.Fx.Ring(transform.position, new Color(0.7f, 1f, 0.72f, 0.65f), 1.15f, 0.3f);
+        Game.I.Audio.Play("sfx_shoot", 0.7f, 0.8f);
+    }
+
+    private IEnumerator BossRoyalCharge(Player player)
+    {
+        Vector2 start = transform.position;
+        Vector2 dir = (Vector2)player.transform.position - start;
+        if (dir.sqrMagnitude < 0.001f) dir = Vector2.right;
+        dir.Normalize();
+        Vector2 marked = player.transform.position;
+        Game.I.Fx.Line(start + Vector2.up * 0.7f, start + dir * 9f + Vector2.up * 0.7f,
+            new Color(0.7f, 1f, 0.72f, 0.8f), 0.14f, 0.55f);
+        Game.I.Fx.TelegraphedCircle(marked, 1.7f, 0.55f, new Color(0.65f, 1f, 0.7f, 0.9f));
+        Game.I.Audio.Play("sfx_boss_roar", 0.5f, 1.1f);
+        yield return new WaitForSeconds(0.55f);
+        if (!CanAct()) yield break;
+
+        Visual.Attack(dir, 1.6f);
+        Game.I.Audio.Play("sfx_dash", 0.85f, 0.9f);
+        bool hit = false;
+        float t = 0f;
+        float duration = phase2 ? 0.42f : 0.38f;
+        while (t < duration)
+        {
+            if (Dead || Game.I == null) yield break;
+            if (Game.I.State == GameState.Pause)
+            {
+                yield return null;
+                continue;
+            }
+            if (Game.I.State != GameState.Combat) yield break;
+
+            t += Time.deltaTime;
+            Vector2 before = transform.position;
+            transform.position = Game.I.Rooms.Move(before,
+                dir * (phase2 ? 15.5f : 13f) * Time.deltaTime, radius);
+            Visual.Walking = true;
+            Visual.Face(dir.x);
+            if (!hit && player != null && !player.Dead &&
+                Vector2.Distance(player.transform.position, transform.position) < 1.55f)
+            {
+                hit = true;
+                player.TakeDamage(Damage * 1.35f, transform.position, false, false, this);
+                Game.I.Shake(0.3f, 0.4f);
+                Game.I.Audio.Play("sfx_hit", 0.8f, 0.75f);
+            }
+            if (Vector2.Distance(before, transform.position) < 0.006f) break;
+            yield return null;
+        }
+
+        Visual.Walking = false;
+        if (!CanAct()) yield break;
+        Game.I.Fx.Explosion(transform.position, 1.8f, new Color(0.7f, 1f, 0.72f));
+        Game.I.Audio.Play("sfx_explosion", 0.65f, 0.9f);
+        if (!hit && player != null && !player.Dead &&
+            Vector2.Distance(player.transform.position, transform.position) < 1.9f)
+        {
+            player.TakeDamage(Damage * 1.05f, transform.position, false, false, this);
+        }
+        yield return new WaitForSeconds(0.2f);
+    }
+
+    private IEnumerator BossVenomFan(Player player)
+    {
+        yield return new WaitForSeconds(0.28f);
+        if (!CanAct()) yield break;
+
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.9f;
+        Vector2 aim = ((Vector2)player.transform.position + Vector2.up * 0.5f - origin).normalized;
+        int count = phase2 ? 7 : 5;
+        const float step = 10f;
+        for (int i = 0; i < count; i++)
+        {
+            float offset = (i - (count - 1) * 0.5f) * step;
+            Projectile.Enemy(origin, Rotate(aim, offset), Damage * 0.62f, 8.8f,
+                Def.Projectile, 1.15f, 0.25f, 5.4f, true, true);
+        }
+        Visual.Attack(aim, 1.15f);
+        Game.I.Fx.Ring(transform.position, new Color(1f, 0.55f, 0.78f, 0.65f), 1.15f, 0.3f);
+        Game.I.Audio.Play("sfx_poison", 0.65f, 1.05f);
+    }
+
+    private IEnumerator BossWebTrap(Player player)
+    {
+        int count = phase2 ? 5 : 3;
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 p = player.transform.position;
+            if (i > 0) p += Random.insideUnitCircle * (phase2 ? 3.2f : 2.6f);
+            p = Game.I.Rooms.Clamp(p, 0.7f);
+            Game.I.Fx.TelegraphedCircle(p, 1.45f, 0.95f, new Color(0.8f, 0.55f, 0.95f, 0.8f));
+            StartCoroutine(WebTrapAt(p, 0.95f, Damage * 0.85f));
+        }
+        Game.I.Audio.Play("sfx_cast", 0.65f, 1.15f);
+        yield return new WaitForSeconds(0.25f);
+    }
+
+    private IEnumerator WebTrapAt(Vector2 p, float delay, float damage)
+    {
+        yield return new WaitForSeconds(delay);
+        if (!CanAct()) yield break;
+        Game.I.Fx.Explosion(p, 1.3f, new Color(0.8f, 0.55f, 0.95f));
+        Game.I.Audio.Play("sfx_poison", 0.55f, 0.95f);
+        Hazard.Poison(p, 1.25f, Damage * 0.35f, 5.2f, false);
+        var player = Game.I.Player;
+        if (player != null && !player.Dead &&
+            Vector2.Distance(player.transform.position, p) < 1.5f)
+        {
+            player.TakeDamage(damage, p);
+            player.Webbed(1.8f, 0.45f);
+        }
+    }
+
+    private IEnumerator BossSoulSpiral(Player player)
+    {
+        yield return new WaitForSeconds(0.2f);
+        if (!CanAct()) yield break;
+
+        int arms = phase2 ? 11 : 8;
+        int volleys = phase2 ? 4 : 3;
+        float offset = 0f;
+        for (int v = 0; v < volleys; v++)
+        {
+            if (!CanAct()) yield break;
+            Visual.Pulse(0.1f, 0.3f);
+            for (int i = 0; i < arms; i++)
+            {
+                float a = i * Mathf.PI * 2f / arms + offset;
+                Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+                Projectile.Enemy((Vector2)transform.position + Vector2.up * 0.9f, d,
+                    Damage * 0.48f, 5.2f, Def.Projectile, 1.2f, 0.24f, 6f);
+            }
+            Game.I.Fx.Ring(transform.position, new Color(0.9f, 0.62f, 0.85f, 0.6f), 1.1f, 0.3f);
+            Game.I.Audio.Play("sfx_cast", 0.55f, 1.1f);
+            offset += 0.28f;
+            yield return new WaitForSeconds(phase2 ? 0.18f : 0.24f);
+        }
+    }
+
+    private IEnumerator BossSoulLance(Player player)
+    {
+        Vector2 origin = (Vector2)transform.position + Vector2.up * 0.9f;
+        Vector2 target = (Vector2)player.transform.position + Vector2.up * 0.5f;
+        Vector2 aim = (target - origin).normalized;
+        Game.I.Fx.Line(origin, target, new Color(0.8f, 0.45f, 1f, 0.7f), 0.16f, 0.8f);
+        Game.I.Fx.TelegraphedCircle(target, 0.95f, 0.8f, new Color(0.85f, 0.5f, 1f, 0.85f));
+        Game.I.Audio.Play("sfx_cast", 0.7f, 0.85f);
+        yield return new WaitForSeconds(0.8f);
+        if (!CanAct()) yield break;
+
+        Visual.Attack(aim, 1.35f);
+        Game.I.Fx.Line(origin, target, new Color(0.9f, 0.6f, 1f, 1f), 0.34f, 0.32f);
+        Game.I.Fx.Explosion(target, 1f, new Color(0.75f, 0.4f, 1f));
+        Game.I.Audio.Play("sfx_lightning", 0.65f, 0.8f);
+        var p = Game.I.Player;
+        if (p != null && !p.Dead)
+        {
+            Vector2 pp = (Vector2)p.transform.position + Vector2.up * 0.5f;
+            float width = phase2 ? 1f : 0.85f;
+            if (DistanceToSegment(pp, origin, target) < width &&
+                Game.I.Rooms.HasLineOfSight(origin, pp))
+            {
+                p.TakeDamage(Damage * 1.55f, target, false, false, this);
+            }
+        }
+        yield return new WaitForSeconds(0.25f);
+    }
+
+    private static float DistanceToSegment(Vector2 p, Vector2 a, Vector2 b)
+    {
+        Vector2 ab = b - a;
+        float lenSq = ab.sqrMagnitude;
+        if (lenSq < 0.000001f) return Vector2.Distance(p, a);
+        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / lenSq);
+        return Vector2.Distance(p, a + ab * t);
     }
 
     private IEnumerator MeteorAt(Vector2 p, float delay, float damage)
     {
         yield return new WaitForSeconds(delay);
-        if (Game.I == null || Game.I.State != GameState.Combat) yield break;
+        if (!CanAct()) yield break;
         Vector3 center = new Vector3(p.x, p.y, 0f);
         Game.I.Fx.Explosion(center, 1.55f, new Color(1f, 0.5f, 0.25f));
         Game.I.Audio.Play("sfx_explosion", 0.55f);
-        if (Vector2.Distance(Game.I.Player.transform.position, p) < 1.65f)
+        if (!Game.I.Player.Dead && Vector2.Distance(Game.I.Player.transform.position, p) < 1.65f)
         {
             Game.I.Player.TakeDamage(damage, p);
         }
@@ -1020,6 +1333,7 @@ public class Enemy : MonoBehaviour
 
     private void Shoot(Player player, Vector2 dir, string sprite, float speed, float scale, bool poison = false)
     {
+        if (!CanAct() || !HasLineOfSight(player)) return;
         Vector2 origin = (Vector2)transform.position + Vector2.up * 0.8f;
         Vector2 d = ((Vector2)player.transform.position + Vector2.up * 0.55f - origin).normalized;
         Projectile.Enemy(origin, d, Damage, speed, sprite, scale, 0.2f, 5f, poison);
@@ -1125,11 +1439,31 @@ public class Enemy : MonoBehaviour
         }
     }
 
+    /// <summary>Убирает адда при победе над боссом, не начисляя урон, убийство и лечение.</summary>
+    public void DespawnSilently()
+    {
+        if (Dead) return;
+        Dead = true;
+        casting = false;
+        winding = false;
+        dashing = false;
+        StopAllCoroutines();
+        if (Bar != null) Bar.SetVisible(false);
+        Visual.SetVisible(false);
+        gameObject.SetActive(false);
+        Destroy(gameObject);
+    }
+
     private void Die(Vector2 source)
     {
         if (Dead) return;
         Dead = true;
         Hp = 0f;
+        casting = false;
+        winding = false;
+        dashing = false;
+        exploding = false;
+        StopAllCoroutines();
         Vector2 dir = (Vector2)transform.position - source;
         Visual.Walking = false;
         Visual.DeathAnim(dir, Boss ? 1.2f : 0.55f);
@@ -1151,7 +1485,6 @@ public class Enemy : MonoBehaviour
         {
             Game.I.Fx.Explosion(transform.position, 3.2f, new Color(0.75f, 0.45f, 0.95f));
             Game.I.Shake(0.4f, 1f);
-            Game.I.Rooms.BossDefeated();
         }
         Destroy(gameObject, Boss ? 1.6f : 0.8f);
     }

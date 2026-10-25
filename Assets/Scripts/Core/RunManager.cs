@@ -4,6 +4,7 @@ using UnityEngine;
 public class RunManager : MonoBehaviour
 {
     public int RoomIndex;
+    public int RunId { get; private set; }
     public int Kills;
     public float DamageDealt;
     public float DamageTaken;
@@ -40,6 +41,7 @@ public class RunManager : MonoBehaviour
 
     public void StartRun()
     {
+        RunId++;
         Dungeon = MetaProgress.SelectedDungeon;
         Hero = MetaProgress.SelectedClass;
         RoomIndex = 0;

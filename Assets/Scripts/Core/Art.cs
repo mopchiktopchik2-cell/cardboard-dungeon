@@ -8,6 +8,8 @@ public class Art
 
     private readonly Dictionary<string, Texture2D> textures = new Dictionary<string, Texture2D>();
     private readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
+    private readonly HashSet<string> missingWarned = new HashSet<string>();
+    private Texture2D missingTexture;
 
     public Font Serif;
     public Font SerifRegular;
@@ -60,8 +62,32 @@ public class Art
     public Texture2D Tex(string name)
     {
         if (textures.TryGetValue(name, out var t)) return t;
-        if (textures.TryGetValue("white", out var w)) return w;
-        return Texture2D.whiteTexture;
+        if (name == "white") return Texture2D.whiteTexture;
+
+        if (missingWarned.Add(name))
+        {
+            Debug.LogError("[Cardboard] Missing texture: " + name);
+        }
+        if (missingTexture == null) missingTexture = CreateMissingTexture();
+        return missingTexture;
+    }
+
+    private static Texture2D CreateMissingTexture()
+    {
+        const int size = 8;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.name = "missing_texture";
+        tex.filterMode = FilterMode.Point;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                bool light = ((x / 2) + (y / 2)) % 2 == 0;
+                tex.SetPixel(x, y, light ? new Color(1f, 0f, 1f, 1f) : new Color(0.12f, 0f, 0.12f, 1f));
+            }
+        }
+        tex.Apply();
+        return tex;
     }
 
     public Sprite World(string name)

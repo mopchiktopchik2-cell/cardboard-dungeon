@@ -27,6 +27,8 @@ public static class MetaProgress
     private const string WeaponKey = "v12_weapon";
     private const string ArmorKey = "v12_armor";
     private const string CharmKey = "v12_charm";
+    private const string SaveVersionKey = "v12_save_version";
+    private const int SaveVersion = 1;
 
     private static bool loaded;
     private static HashSet<string> owned;
@@ -55,13 +57,14 @@ public static class MetaProgress
         {
             Load();
             string id = PlayerPrefs.GetString(DungeonKey, "crypt");
-            if (Data.Dungeon(id) == null) id = "crypt";
+            if (Data.FindDungeon(id) == null) id = "crypt";
             return id;
         }
         set
         {
             Load();
-            PlayerPrefs.SetString(DungeonKey, string.IsNullOrEmpty(value) ? "crypt" : value);
+            string id = Data.FindDungeon(value) != null ? value : "crypt";
+            PlayerPrefs.SetString(DungeonKey, id);
             PlayerPrefs.Save();
         }
     }
@@ -73,6 +76,7 @@ public static class MetaProgress
     {
         if (loaded) return;
         loaded = true;
+        if (!PlayerPrefs.HasKey(SaveVersionKey)) PlayerPrefs.SetInt(SaveVersionKey, SaveVersion);
         owned = new HashSet<string>();
         equipped = new Dictionary<EquipSlot, string>();
         string raw = PlayerPrefs.GetString(OwnedKey, "");
@@ -257,7 +261,7 @@ public static class MetaProgress
     public static bool IsDungeonUnlocked(string dungeonId)
     {
         int index = Data.Dungeons.FindIndex(d => d.Id == dungeonId);
-        return index < 0 || IsDungeonUnlocked(index);
+        return index >= 0 && IsDungeonUnlocked(index);
     }
 
     public static DungeonDef NextDungeon(DungeonDef current)
@@ -275,7 +279,7 @@ public static class MetaProgress
 
     public static void RecordRun(string dungeonId, int reached, int kills, bool victory)
     {
-        if (string.IsNullOrEmpty(dungeonId)) return;
+        if (Data.FindDungeon(dungeonId) == null) return;
         int bestRoom = PlayerPrefs.GetInt("best_room_" + dungeonId, 0);
         int bestKills = PlayerPrefs.GetInt("best_kills_" + dungeonId, 0);
         if (reached > bestRoom) PlayerPrefs.SetInt("best_room_" + dungeonId, reached);
@@ -284,5 +288,30 @@ public static class MetaProgress
         if (reached > PlayerPrefs.GetInt("best_room", 0)) PlayerPrefs.SetInt("best_room", reached);
         if (kills > PlayerPrefs.GetInt("best_kills", 0)) PlayerPrefs.SetInt("best_kills", kills);
         PlayerPrefs.Save();
+    }
+
+    /// <summary>Сбрасывает только прогресс: класс, подземелье, лут и рекорды.</summary>
+    public static void ResetProgress()
+    {
+        PlayerPrefs.DeleteKey(ClassKey);
+        PlayerPrefs.DeleteKey(DungeonKey);
+        PlayerPrefs.DeleteKey(OwnedKey);
+        PlayerPrefs.DeleteKey(WeaponKey);
+        PlayerPrefs.DeleteKey(ArmorKey);
+        PlayerPrefs.DeleteKey(CharmKey);
+        PlayerPrefs.DeleteKey("best_room");
+        PlayerPrefs.DeleteKey("best_kills");
+        foreach (var dungeon in Data.Dungeons)
+        {
+            PlayerPrefs.DeleteKey("best_room_" + dungeon.Id);
+            PlayerPrefs.DeleteKey("best_kills_" + dungeon.Id);
+            PlayerPrefs.DeleteKey("clears_" + dungeon.Id);
+        }
+        PlayerPrefs.SetInt(SaveVersionKey, SaveVersion);
+        PlayerPrefs.Save();
+        loaded = false;
+        owned = null;
+        equipped = null;
+        Load();
     }
 }

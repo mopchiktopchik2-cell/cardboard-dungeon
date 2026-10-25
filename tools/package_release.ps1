@@ -4,15 +4,14 @@
     Builds the clean Windows x64 release archive from Build/.
 
 .DESCRIPTION
-    Copies the portable launchers into Build/, creates a relative .lnk shortcut,
-    packs only the game files (no QA build, logs or screenshots) and prints the
-    archive size and SHA256 for the GitHub release notes.
+    Copies the portable .bat launcher and memo into Build/, removes stale
+    shortcuts, packs only the game files (no QA build, logs or screenshots) and
+    prints the archive size and SHA256 for the GitHub release notes.
 #>
 param(
     [string]$BuildDir = (Join-Path $PSScriptRoot '..\Build'),
     [string]$OutputZip = (Join-Path $PSScriptRoot '..\CardboardDungeon_v1.3.1_win64.zip'),
-    [string]$ExeName = 'CardboardDungeon.exe',
-    [string]$Description = 'Cardboard Dungeon v1.3.1'
+    [string]$ExeName = 'CardboardDungeon.exe'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,20 +38,16 @@ foreach ($file in $launcherFiles) {
     Write-Host "Staged launcher: $($file.Name)"
 }
 
-$batFile = $launcherFiles | Where-Object { $_.Extension -eq '.bat' } | Select-Object -First 1
-$shortcutName = if ($batFile) { [IO.Path]::GetFileNameWithoutExtension($batFile.Name) + '.lnk' } else { 'Play.lnk' }
+# Shortcuts are not portable between machines, so the release ships only
+# the .bat launcher and the .exe. Remove stale links from earlier staging.
+Get-ChildItem -LiteralPath $BuildDir -Filter '*.lnk' -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force
 
-& (Join-Path $launcherDir 'make_shortcut.ps1') `
-    -GameDir $BuildDir `
-    -ShortcutName $shortcutName `
-    -ExeName $ExeName `
-    -Description $Description
-
-$launcherNames = @($launcherFiles.Name) + $shortcutName
+$launcherNames = @($launcherFiles.Name)
 
 # --- collect release files -------------------------------------------------
-$excludedDirs = @('qa')
-$excludedExtensions = @('.log')
+$excludedDirs = @('qa', 'qa_shots')
+$excludedExtensions = @('.log', '.lnk')
 $excludedNames = @('desktop.ini', 'thumbs.db')
 
 $files = Get-ChildItem -LiteralPath $BuildDir -Recurse -File | Where-Object {

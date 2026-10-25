@@ -30,6 +30,7 @@ public class UIRoot : MonoBehaviour
     private CanvasGroup endGroup;
     private CanvasGroup bannerGroup;
     private CanvasGroup equipGroup;
+    private CanvasGroup settingsGroup;
 
     private RectTransform perkCardsRoot;
     private RectTransform menuRoot;
@@ -84,6 +85,18 @@ public class UIRoot : MonoBehaviour
     private Text endTitle;
     private Text endStats;
     private Text pauseTitle;
+    private Text fullscreenText;
+    private Text settingsFullscreenText;
+    private Text settingsResolutionText;
+    private Text settingsFpsText;
+    private Text settingsResetText;
+    private Slider masterSlider;
+    private Slider musicSlider;
+    private Slider sfxSlider;
+    private Slider settingsMasterSlider;
+    private Slider settingsMusicSlider;
+    private Slider settingsSfxSlider;
+    private bool resetConfirm;
 
     private Image hpFill;
     private Image shieldFill;
@@ -126,6 +139,7 @@ public class UIRoot : MonoBehaviour
         BuildBanner();
         BuildOverlays();
         BuildEquipment();
+        BuildSettings();
         Debug.Log("[Cardboard] UI ready");
     }
 
@@ -409,12 +423,14 @@ public class UIRoot : MonoBehaviour
         MakeButton(menuRoot, "СПУСТИТЬСЯ", new Vector2(0f, -232f), new Vector2(430f, 64f),
             () => Game.I.StartRun(), 29);
 
-        MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-170f, -314f), new Vector2(160f, 46f),
-            ShowEquipment, 17, false);
-        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(0f, -314f), new Vector2(160f, 46f),
-            ToggleHelp, 17, false);
-        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(170f, -314f), new Vector2(160f, 46f),
-            () => Game.I.QuitGame(), 17, false);
+        MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-255f, -314f), new Vector2(160f, 46f),
+            ShowEquipment, 16, false);
+        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(-85f, -314f), new Vector2(160f, 46f),
+            ToggleHelp, 16, false);
+        MakeButton(menuRoot, "НАСТРОЙКИ", new Vector2(85f, -314f), new Vector2(160f, 46f),
+            ShowSettings, 16, false);
+        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(255f, -314f), new Vector2(160f, 46f),
+            () => Game.I.QuitGame(), 16, false);
 
         for (int i = 0; i < 24; i++)
         {
@@ -436,10 +452,6 @@ public class UIRoot : MonoBehaviour
             18, new Color(0.8f, 0.74f, 0.64f, 0.95f), TextAnchor.MiddleCenter,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
             new Vector2(1120f, 28f), art.Sans, true);
-
-        TextAt(menuRoot, "v1.3.1", 16, new Color(0.7f, 0.65f, 0.58f, 0.8f), TextAnchor.MiddleRight,
-            new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-28f, 22f),
-            new Vector2(120f, 24f), art.Sans, false);
 
         BuildHelp();
         RefreshMenuSelection();
@@ -663,7 +675,8 @@ public class UIRoot : MonoBehaviour
 
     public bool HelpOpen => helpPanel != null && helpPanel.gameObject.activeSelf;
     public bool EquipmentOpen => equipGroup != null && equipGroup.gameObject.activeSelf;
-    public bool MenuOverlayOpen => HelpOpen || EquipmentOpen;
+    public bool SettingsOpen => settingsGroup != null && settingsGroup.gameObject.activeSelf;
+    public bool MenuOverlayOpen => HelpOpen || EquipmentOpen || SettingsOpen;
     public bool RestScreenOpen => restMode;
     public bool SkillScreenOpen => skillMode;
 
@@ -671,6 +684,7 @@ public class UIRoot : MonoBehaviour
     {
         if (helpPanel != null) helpPanel.gameObject.SetActive(false);
         SetGroup(equipGroup, false);
+        SetGroup(settingsGroup, false);
         ResetLowHp();
         SetGroup(menuGroup, true);
         SetGroup(hudGroup, false);
@@ -685,6 +699,7 @@ public class UIRoot : MonoBehaviour
     public void HideMenu()
     {
         SetGroup(equipGroup, false);
+        SetGroup(settingsGroup, false);
         SetGroup(menuGroup, false);
     }
 
@@ -1171,11 +1186,6 @@ public class UIRoot : MonoBehaviour
     }
 
     // ------------------------------------------------------------------ пауза
-    private Slider masterSlider;
-    private Slider musicSlider;
-    private Slider sfxSlider;
-    private Text fullscreenText;
-
     private void BuildPause()
     {
         pauseGroup = NewGroup("Pause");
@@ -1211,16 +1221,18 @@ public class UIRoot : MonoBehaviour
         musicSlider.onValueChanged.AddListener(_ => ApplyVolumes());
         sfxSlider.onValueChanged.AddListener(_ => ApplyVolumes());
 
-        var fsBtn = MakeButton(pausePanel, "ЭКРАН: ОКНО", new Vector2(0f, -304f), new Vector2(300f, 46f),
-            ToggleFullscreen, 19, false);
+        var fsBtn = MakeButton(pausePanel, "ЭКРАН: ОКНО", new Vector2(-88f, -304f), new Vector2(172f, 46f),
+            ToggleFullscreen, 17, false);
         fullscreenText = fsBtn.GetComponentInChildren<Text>();
+        MakeButton(pausePanel, "НАСТРОЙКИ", new Vector2(88f, -304f), new Vector2(172f, 46f),
+            ShowSettings, 17, false);
     }
 
     private Slider AddSlider(Transform parent, string label, float y, float value)
     {
         TextAt(parent, label, 17, new Color(0.86f, 0.79f, 0.68f), TextAnchor.MiddleLeft,
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f),
-            new Vector2(-200f, y + 23f), new Vector2(400f, 22f), art.Sans, true);
+            new Vector2(-200f, y + 31f), new Vector2(400f, 22f), art.Sans, true);
 
         var root = MakeRect("slider", parent, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f), new Vector2(0f, y), new Vector2(400f, 26f));
@@ -1262,15 +1274,8 @@ public class UIRoot : MonoBehaviour
 
     private void ToggleFullscreen()
     {
-        Screen.fullScreenMode = Screen.fullScreenMode == FullScreenMode.Windowed
-            ? FullScreenMode.FullScreenWindow
-            : FullScreenMode.Windowed;
-        if (fullscreenText != null)
-        {
-            fullscreenText.text = Screen.fullScreenMode == FullScreenMode.Windowed
-                ? "ЭКРАН: ОКНО"
-                : "ЭКРАН: ПОЛНЫЙ";
-        }
+        ScreenSettings.SetFullscreen(!ScreenSettings.Fullscreen);
+        UpdateScreenLabels();
     }
 
     public void ShowPause()
@@ -1279,17 +1284,13 @@ public class UIRoot : MonoBehaviour
         if (masterSlider != null) masterSlider.SetValueWithoutNotify(Game.I.Audio.Master);
         if (musicSlider != null) musicSlider.SetValueWithoutNotify(Game.I.Audio.MusicVolume);
         if (sfxSlider != null) sfxSlider.SetValueWithoutNotify(Game.I.Audio.SfxVolume);
-        if (fullscreenText != null)
-        {
-            fullscreenText.text = Screen.fullScreenMode == FullScreenMode.Windowed
-                ? "ЭКРАН: ОКНО"
-                : "ЭКРАН: ПОЛНЫЙ";
-        }
+        UpdateScreenLabels();
         SetGroup(pauseGroup, true);
     }
 
     public void HidePause()
     {
+        SetGroup(settingsGroup, false);
         SetGroup(pauseGroup, false);
     }
 
@@ -1496,7 +1497,148 @@ public class UIRoot : MonoBehaviour
         SetGroup(endGroup, false);
     }
 
-    // ------------------------------------------------------------------ снаряжение
+    // ------------------------------------------------------------------ настройки
+    private void BuildSettings()
+    {
+        settingsGroup = NewGroup("Settings");
+        var root = settingsGroup.GetComponent<RectTransform>();
+        Img(root, art.UI("white"), new Color(0.02f, 0.01f, 0.03f, 0.78f),
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false, true);
+
+        var panel = MakeRect("SettingsPanel", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720f, 780f));
+        var bg = panel.gameObject.AddComponent<Image>();
+        bg.sprite = art.UI("white");
+        bg.type = Image.Type.Simple;
+        bg.color = new Color(0.055f, 0.035f, 0.065f, 1f);
+        bg.raycastTarget = true;
+        Img(panel, art.UI("ui_panel", new Vector4(28f, 28f, 28f, 28f)), Color.white,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, true, false);
+
+        TextAt(panel, "НАСТРОЙКИ", 44, Pal.Gold, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f),
+            new Vector2(600f, 56f), art.Serif, true);
+        settingsMasterSlider = AddSlider(panel, "ОБЩАЯ ГРОМКОСТЬ", 235f, 0.8f);
+        settingsMusicSlider = AddSlider(panel, "МУЗЫКА", 165f, 0.6f);
+        settingsSfxSlider = AddSlider(panel, "ЗВУКИ", 95f, 0.85f);
+        settingsMasterSlider.onValueChanged.AddListener(_ => ApplySettingsVolumes());
+        settingsMusicSlider.onValueChanged.AddListener(_ => ApplySettingsVolumes());
+        settingsSfxSlider.onValueChanged.AddListener(_ => ApplySettingsVolumes());
+
+        TextAt(panel, "ЭКРАН", 18, new Color(0.86f, 0.75f, 0.58f), TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(-220f, 22f), new Vector2(430f, 24f), art.Sans, true);
+
+        var fullBtn = MakeButton(panel, "ЭКРАН: ОКНО", new Vector2(0f, -20f), new Vector2(440f, 44f),
+            ToggleFullscreen, 18, false);
+        settingsFullscreenText = fullBtn.GetComponentInChildren<Text>();
+
+        var resBtn = MakeButton(panel, "РАЗРЕШЕНИЕ: 1600×900", new Vector2(0f, -76f), new Vector2(440f, 44f),
+            CycleResolution, 18, false);
+        settingsResolutionText = resBtn.GetComponentInChildren<Text>();
+
+        var fpsBtn = MakeButton(panel, "ЧАСТОТА: 60 FPS", new Vector2(0f, -132f), new Vector2(440f, 44f),
+            CycleFps, 18, false);
+        settingsFpsText = fpsBtn.GetComponentInChildren<Text>();
+
+        var resetBtn = MakeButton(panel, "СБРОСИТЬ ПРОГРЕСС", new Vector2(0f, -222f), new Vector2(440f, 44f),
+            ResetProgressClicked, 17, false);
+        settingsResetText = resetBtn.GetComponentInChildren<Text>();
+
+        TextAt(panel, "Настройки сохраняются автоматически. Сброс прогресса удалит лут и рекорды.",
+            14, new Color(0.7f, 0.66f, 0.6f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 82f),
+            new Vector2(600f, 32f), art.Sans, true);
+
+        MakeButton(panel, "ЗАКРЫТЬ", new Vector2(0f, -330f), new Vector2(240f, 46f),
+            HideSettings, 21, false);
+
+        SetGroup(settingsGroup, false);
+        UpdateScreenLabels();
+    }
+
+    public void ShowSettings()
+    {
+        if (helpPanel != null) helpPanel.gameObject.SetActive(false);
+        SetGroup(equipGroup, false);
+        resetConfirm = false;
+        UpdateResetLabel();
+        if (settingsMasterSlider != null) settingsMasterSlider.SetValueWithoutNotify(Game.I.Audio.Master);
+        if (settingsMusicSlider != null) settingsMusicSlider.SetValueWithoutNotify(Game.I.Audio.MusicVolume);
+        if (settingsSfxSlider != null) settingsSfxSlider.SetValueWithoutNotify(Game.I.Audio.SfxVolume);
+        UpdateScreenLabels();
+        SetGroup(settingsGroup, true);
+    }
+
+    public void HideSettings()
+    {
+        resetConfirm = false;
+        UpdateResetLabel();
+        SetGroup(settingsGroup, false);
+    }
+
+    private void ApplySettingsVolumes()
+    {
+        if (settingsMasterSlider == null || settingsMusicSlider == null || settingsSfxSlider == null) return;
+        Game.I.Audio.SetVolumes(settingsMasterSlider.value, settingsMusicSlider.value, settingsSfxSlider.value);
+    }
+
+    private void CycleResolution()
+    {
+        int next = (ScreenSettings.ResolutionIndex + 1) % ScreenSettings.Resolutions.Length;
+        ScreenSettings.SetResolution(next);
+        UpdateScreenLabels();
+    }
+
+    private void CycleFps()
+    {
+        int next = (ScreenSettings.FpsMode + 1) % ScreenSettings.FpsNames.Length;
+        ScreenSettings.SetFps(next);
+        UpdateScreenLabels();
+    }
+
+    private void ResetProgressClicked()
+    {
+        if (!resetConfirm)
+        {
+            resetConfirm = true;
+            UpdateResetLabel();
+            return;
+        }
+        resetConfirm = false;
+        MetaProgress.ResetProgress();
+        Game.I.ToMenu();
+        ShowSettings();
+    }
+
+    private void UpdateResetLabel()
+    {
+        if (settingsResetText != null)
+        {
+            settingsResetText.text = resetConfirm ? "ТОЧНО СБРОСИТЬ?" : "СБРОСИТЬ ПРОГРЕСС";
+        }
+    }
+
+    private void UpdateScreenLabels()
+    {
+        if (fullscreenText != null)
+        {
+            fullscreenText.text = ScreenSettings.Fullscreen ? "ЭКРАН: ПОЛНЫЙ" : "ЭКРАН: ОКНО";
+        }
+        if (settingsFullscreenText != null)
+        {
+            settingsFullscreenText.text = ScreenSettings.Fullscreen ? "ЭКРАН: ПОЛНЫЙ" : "ЭКРАН: ОКНО";
+        }
+        if (settingsResolutionText != null)
+        {
+            settingsResolutionText.text = "РАЗРЕШЕНИЕ: " + ScreenSettings.ResolutionName(ScreenSettings.ResolutionIndex);
+        }
+        if (settingsFpsText != null)
+        {
+            settingsFpsText.text = "ЧАСТОТА: " + ScreenSettings.FpsNames[ScreenSettings.FpsMode];
+        }
+    }
+
     private void BuildEquipment()
     {
         equipGroup = NewGroup("Equipment");
@@ -1608,7 +1750,11 @@ public class UIRoot : MonoBehaviour
 
         for (int i = equipItemsRoot.childCount - 1; i >= 0; i--)
         {
-            Destroy(equipItemsRoot.GetChild(i).gameObject);
+            var child = equipItemsRoot.GetChild(i).gameObject;
+            // Destroy отложен до конца кадра; выключаем карточку сразу,
+            // чтобы она не перехватывала клики у нового списка.
+            child.SetActive(false);
+            Destroy(child);
         }
 
         var items = MetaProgress.OwnedItems();
