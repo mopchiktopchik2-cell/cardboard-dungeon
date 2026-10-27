@@ -317,7 +317,8 @@ public class Enemy : MonoBehaviour
         casting = false;
     }
 
-    private void MeleeAI(Player player, Vector2 dir, float dist, float dt, float speedK, bool poison = false)
+    private void MeleeAI(Player player, Vector2 dir, float dist, float dt, float speedK, bool poison = false,
+        float windupTime = 0.3f)
     {
         if (winding)
         {
@@ -349,7 +350,7 @@ public class Enemy : MonoBehaviour
             if (attackCd <= 0f)
             {
                 winding = true;
-                windup = 0.3f;
+                windup = windupTime;
                 Visual.Windup(windup);
                 Visual.Flash(new Color(1f, 0.55f, 0.5f), 0.18f);
             }
@@ -758,33 +759,40 @@ public class Enemy : MonoBehaviour
 
     private void HoundAI(Player player, Vector2 dir, float dist, float dt)
     {
-        if (specialCd <= 0f && dist > 1.3f && dist < 7f)
+        // Собака не стреляет и не кайтит: держит только дистанцию укуса.
+        // Прыжок остаётся длинным рывком, но с явным телеграфом и уроном только после приземления.
+        if (specialCd <= 0f && dist > 2.1f && dist < 7f)
         {
-            specialCd = 5.8f;
+            specialCd = 5.6f;
             StartCoroutine(HoundPounce(player));
             return;
         }
-        MeleeAI(player, dir, dist, dt, 1.12f);
+        MeleeAI(player, dir, dist, dt, 1.16f, false, 0.42f);
     }
 
     private IEnumerator HoundPounce(Player player)
     {
         casting = true;
         Visual.Walking = false;
+        Vector2 start = transform.position;
         Vector2 target = player.transform.position;
-        Visual.Windup(0.4f);
-        Visual.Flash(new Color(1f, 0.72f, 0.4f), 0.18f);
-        Game.I.Fx.TelegraphedCircle(target, 1.2f, 0.4f, new Color(1f, 0.65f, 0.3f));
-        yield return new WaitForSeconds(0.4f);
+        Visual.Face(target.x - start.x);
+        Visual.Windup(0.55f);
+        Visual.Flash(new Color(1f, 0.72f, 0.4f), 0.24f);
+        Game.I.Fx.TelegraphedCircle(target, 1.2f, 0.55f, new Color(1f, 0.55f, 0.22f));
+        Game.I.Fx.Line(start + Vector2.up * 0.45f, target + Vector2.up * 0.45f,
+            new Color(1f, 0.5f, 0.2f, 0.5f), 0.12f, 0.55f);
+        Game.I.Fx.Ring(start, new Color(1f, 0.55f, 0.25f, 0.7f), 0.9f, 0.55f);
+        Game.I.Audio.Play("sfx_dash", 0.35f, 0.85f);
+        yield return new WaitForSeconds(0.55f);
         if (Dead || Game.I == null || Game.I.State != GameState.Combat)
         {
             casting = false;
             yield break;
         }
-        Vector2 start = transform.position;
         target = Game.I.Rooms.Move(target, Vector2.zero, radius);
         float t = 0f;
-        const float flight = 0.28f;
+        const float flight = 0.32f;
         while (t < flight)
         {
             if (!CanAct())
@@ -810,12 +818,14 @@ public class Enemy : MonoBehaviour
         transform.position = target;
         Game.I.Fx.Dust(transform.position, 6, 0.9f);
         Game.I.Audio.Play("sfx_hit", 0.45f, 1.35f);
-        if (Vector2.Distance(transform.position, player.transform.position) < 1.25f &&
+        // Урон только в момент приземления, а не во время разбега или полёта.
+        if (Vector2.Distance(transform.position, player.transform.position) < 1.2f &&
             player.Invuln <= 0f && !player.Dead)
         {
-            player.TakeDamage(Damage * 1.3f, transform.position, false, false, this);
+            player.TakeDamage(Damage * 1.25f, transform.position, false, false, this);
         }
         Visual.Walking = false;
+        yield return new WaitForSeconds(0.18f);
         casting = false;
         attackCd = Def.Cooldown;
     }

@@ -358,6 +358,9 @@ public class Game : MonoBehaviour
         Player.Invuln = 0f;
         Player.Heal(9999f);
 
+        // 1b. Вражеские удары: снаряд и собака должны реально снимать HP.
+        yield return QaEnemyHitChecks();
+
         // 2. Босс убит, но забег перезапускают до конца задержки победы.
         yield return QaEnterBoss();
         AuditCheck("boss spawned", Rooms.Enemies.Exists(e => e != null && e.Boss));
@@ -439,6 +442,68 @@ public class Game : MonoBehaviour
             left -= Time.unscaledDeltaTime;
             yield return null;
         }
+    }
+
+    private IEnumerator QaEnemyHitChecks()
+    {
+        // Отдельная пустая комната, чтобы чужие атаки не маскировали результат.
+        StopFlow();
+        Run.RoomIndex = 1;
+        Rooms.BuildRoom(1, false);
+        Player.RevivePosition(Rooms.PlayerSpawn);
+        Player.SetVisible(true);
+        Player.OnRoomStart();
+        Player.QaInvincible = false;
+        Player.Invuln = 0f;
+        Player.Heal(9999f);
+        State = GameState.Combat;
+        Transitioning = false;
+        UI.RefreshRoom();
+        yield return new WaitForSecondsRealtime(0.3f);
+
+        float hpBeforeProjectile = Player.Stats.hp;
+        Player.Invuln = 0f;
+        Projectile.Enemy((Vector2)Player.transform.position + Vector2.up * 1.4f, Vector2.down,
+            6f, 6f, "proj_arrow");
+        yield return QaWaitFor(() => Player.Stats.hp < hpBeforeProjectile, 1.5f);
+        AuditCheck("enemy projectile hits player", Player.Stats.hp < hpBeforeProjectile);
+        Player.Heal(9999f);
+        Player.Invuln = 0f;
+
+        Vector2 houndPos = (Vector2)Player.transform.position + Vector2.right * 2.8f;
+        var hound = Enemy.Spawn(EnemyKind.Hound, houndPos, 1f, 1f);
+        hound.MaxHp = 99999f;
+        hound.Hp = hound.MaxHp;
+        Rooms.Enemies.Add(hound);
+        float startDistance = Vector2.Distance(Player.transform.position, hound.transform.position);
+        yield return new WaitForSecondsRealtime(0.75f);
+        float closedDistance = Vector2.Distance(Player.transform.position, hound.transform.position);
+        AuditCheck("hound closes distance to attack", closedDistance < startDistance - 0.25f);
+
+        float hpBeforeBite = Player.Stats.hp;
+        Player.Invuln = 0f;
+        yield return QaWaitFor(() => Player.Stats.hp < hpBeforeBite, 3f);
+        AuditCheck("hound bite damages player", Player.Stats.hp < hpBeforeBite);
+
+        if (hound != null)
+        {
+            Rooms.Enemies.Remove(hound);
+            Destroy(hound.gameObject);
+        }
+        Player.Heal(9999f);
+        Player.Invuln = 0f;
+
+        // Переход в следующую комнату должен вернуть 20% максимального HP.
+        Player.QaInvincible = true;
+        Player.Stats.hp = Player.Stats.maxHp * 0.5f;
+        float expectedAfterTransition = Player.Stats.hp + Player.Stats.maxHp * Data.RoomTransitionHeal;
+        ContinueAfterChoice();
+        yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == 2, 6f);
+        AuditCheck("room transition heals 20% max hp",
+            Player.Stats.hp >= expectedAfterTransition - 1f);
+        Player.QaInvincible = false;
+        Player.Heal(9999f);
+        yield return new WaitForSecondsRealtime(0.2f);
     }
 
     private IEnumerator QaEnterBoss()
@@ -782,12 +847,17 @@ public class Game : MonoBehaviour
         if (State == GameState.Dead) yield break;
         Rooms.OpenDoor();
         Audio.Play("sfx_door", 0.8f);
-        Cam.Shake(0.08f, 0.3f);
+        Vector2 doorFx = Rooms.RightDoorPosition + Vector2.up * 0.55f;
+        Fx.Ring(doorFx, new Color(1f, 0.78f, 0.45f, 0.8f), 1.0f, 0.5f);
+        Fx.Burst("fx_dust", doorFx, 12, 2.2f, 0.7f, 0.9f,
+            new Color(0.95f, 0.8f, 0.55f, 0.7f), 1600);
+        UI.Flash(new Color(1f, 0.82f, 0.5f, 0.16f), 0.32f);
+        Cam.Shake(0.12f, 0.35f);
         yield return WaitReal(0.35f);
         if (State == GameState.Dead) yield break;
 
         // бумажный занавес
-        yield return UI.Wipe(true, 0.45f);
+        yield return UI.Wipe(true, 0.5f);
         if (State == GameState.Dead) yield break;
         Run.RoomIndex++;
         Rooms.BuildRoom(Run.RoomIndex, false);
@@ -798,7 +868,18 @@ public class Game : MonoBehaviour
         Player.SetVisible(true);
         Player.OnRoomStart();
         UI.RefreshRoom();
-        yield return UI.Wipe(false, 0.5f);
+        yield return UI.Wipe(false, 0.55f);
+
+        // После перехода герой получает передышку в 20% максимального запаса HP.
+        float beforeHeal = Player.Stats.hp;
+        Player.Heal(Player.Stats.maxHp * Data.RoomTransitionHeal);
+        bool healed = Player.Stats.hp > beforeHeal + 0.5f;
+        if (healed) Fx.Heal(Player.transform.position + Vector3.up * 0.5f);
+        Fx.Ring(Player.transform.position + Vector3.up * 0.5f,
+            new Color(0.55f, 0.85f, 1f, 0.75f), 1.4f, 0.55f);
+        Fx.Burst("fx_dust", Player.transform.position, 8, 1.8f, 0.55f, 0.75f,
+            new Color(0.7f, 0.9f, 1f, 0.6f), 1600);
+        UI.Flash(new Color(0.9f, 0.95f, 1f, 0.1f), 0.32f);
 
         UI.SetSkipHint(false);
         var room = rooms[Run.RoomIndex];

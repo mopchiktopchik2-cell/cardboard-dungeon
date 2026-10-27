@@ -131,6 +131,7 @@ public static partial class Data
 
     public const float LifestealPerPerk = 0.03f;
     public const float LifestealCap = 0.12f;
+    public const float RoomTransitionHeal = 0.20f;
     public const float KnightShieldPercent = 0.30f;
     public const float ShieldDuration = 5f;
     public const float KnightShieldCooldown = 10f;
@@ -271,7 +272,7 @@ public static partial class Data
         [EnemyKind.Hound] = new EnemyDef
         {
             Kind = EnemyKind.Hound, Name = "ГОЛОДНЫЙ ГОНЧИЙ", Sprite = "hound",
-            Hp = 46, Speed = 4.25f, Damage = 14, Range = 5.2f, Cooldown = 2.45f, Scale = 0.98f,
+            Hp = 46, Speed = 4.25f, Damage = 14, Range = 1.15f, Cooldown = 2.1f, Scale = 0.98f,
             Special = "pounce"
         },
         [EnemyKind.BoneKing] = new EnemyDef
@@ -315,16 +316,78 @@ public static partial class Data
         return skill.Cooldown;
     }
 
+    // Классовые пулы разделены полностью: общими остаются только лечение,
+    // голем и базовые перки, которые не относятся к чужой школе.
+    private static readonly string[] MageSkillIds =
+    {
+        "fireball", "nova", "chain", "meteor", "blink", "missiles", "slow", "frost", "heal", "golem"
+    };
+
+    private static readonly string[] SwordsmanSkillIds =
+    {
+        "shield", "cleave", "rage", "heal", "golem"
+    };
+
+    private static readonly string[] RangerSkillIds =
+    {
+        "volley", "shadowrun", "poison", "heal", "golem"
+    };
+
+    private static readonly string[] SharedPerkIds =
+    {
+        "damage", "attackspeed", "movespeed", "hp", "lifesteal", "crit", "bomb", "healroom",
+        "secondwind", "slot"
+    };
+
+    private static readonly string[] MagePerkIds =
+    {
+        "cdr", "skillpower", "freeze"
+    };
+
+    private static readonly string[] SwordsmanPerkIds =
+    {
+        "shieldstart", "thorns", "armor"
+    };
+
+    private static readonly string[] RangerPerkIds =
+    {
+        "pierce", "multi", "poison"
+    };
+
+    private static bool InPool(string[] pool, string id)
+    {
+        return !string.IsNullOrEmpty(id) && System.Array.IndexOf(pool, id) >= 0;
+    }
+
     public static bool SkillAllowedForClass(string skillId, HeroClass hero)
     {
-        // Щит — классовая способность рыцаря; другим классам он не выпадает.
-        return skillId != "shield" || hero == HeroClass.Swordsman;
+        switch (hero)
+        {
+            case HeroClass.Mage:
+                return InPool(MageSkillIds, skillId);
+            case HeroClass.Swordsman:
+                return InPool(SwordsmanSkillIds, skillId);
+            case HeroClass.Ranger:
+                return InPool(RangerSkillIds, skillId);
+            default:
+                return false;
+        }
     }
 
     public static bool PerkAllowedForClass(string perkId, HeroClass hero)
     {
-        // Барьер тоже относится к рыцарскому щиту.
-        return perkId != "shieldstart" || hero == HeroClass.Swordsman;
+        if (InPool(SharedPerkIds, perkId)) return true;
+        switch (hero)
+        {
+            case HeroClass.Mage:
+                return InPool(MagePerkIds, perkId);
+            case HeroClass.Swordsman:
+                return InPool(SwordsmanPerkIds, perkId);
+            case HeroClass.Ranger:
+                return InPool(RangerPerkIds, perkId);
+            default:
+                return false;
+        }
     }
 
     public static PerkDef Perk(string id)

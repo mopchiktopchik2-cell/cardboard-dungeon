@@ -106,6 +106,9 @@ public class UIRoot : MonoBehaviour
     private Image flashImage;
     private Image fadeImage;
     private Image wipeImage;
+    private Image wipeBackImage;
+    private RectTransform wipeRt;
+    private RectTransform wipeBackRt;
     private Image bossGroup;
     private Image bannerBg;
     private Image grainImage;
@@ -343,7 +346,7 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3.1", 20, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3.2", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
@@ -721,49 +724,56 @@ public class UIRoot : MonoBehaviour
         hudGroup.blocksRaycasts = false;
         var root = hudGroup.GetComponent<RectTransform>();
 
+        var hpPanel = Img(root, art.UI("ui_panel_dark", new Vector4(18f, 18f, 18f, 18f)),
+            new Color(0.1f, 0.065f, 0.09f, 0.78f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+            new Vector2(0f, 1f), new Vector2(16f, -18f), new Vector2(470f, 94f), true);
+        hpPanel.raycastTarget = false;
+
         var heart = Img(root, art.UI("ui_heart"), Color.white, new Vector2(0f, 1f), new Vector2(0f, 1f),
-            new Vector2(0f, 1f), new Vector2(30f, -28f), new Vector2(44f, 44f), false);
+            new Vector2(0f, 1f), new Vector2(30f, -28f), new Vector2(58f, 58f), false);
         heart.preserveAspect = true;
 
         var barBg = Img(root, art.UI("ui_bar_bg", new Vector4(10f, 10f, 10f, 10f)), Color.white,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(82f, -32f),
-            new Vector2(300f, 26f), true);
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(102f, -36f),
+            new Vector2(380f, 40f), true);
         barBg.raycastTarget = false;
 
         var fillRt = MakeRect("fill", barBg.transform, Vector2.zero, Vector2.one, new Vector2(0f, 0.5f),
             Vector2.zero, Vector2.zero);
-        fillRt.offsetMin = new Vector2(3f, 3f);
-        fillRt.offsetMax = new Vector2(-3f, -3f);
+        fillRt.offsetMin = new Vector2(4f, 4f);
+        fillRt.offsetMax = new Vector2(-4f, -4f);
         hpFill = fillRt.gameObject.AddComponent<Image>();
         hpFill.sprite = art.UI("ui_bar_fill", new Vector4(10f, 10f, 10f, 10f));
         hpFill.type = Image.Type.Sliced;
-        hpFill.color = new Color(0.83f, 0.35f, 0.3f);
+        hpFill.color = new Color(0.9f, 0.32f, 0.27f);
         hpFill.raycastTarget = false;
 
         var shieldRt = MakeRect("shield", barBg.transform, Vector2.zero, Vector2.one,
             new Vector2(0f, 0.5f), Vector2.zero, Vector2.zero);
-        shieldRt.offsetMin = new Vector2(4f, 4f);
-        shieldRt.offsetMax = new Vector2(-4f, -4f);
+        shieldRt.offsetMin = new Vector2(5f, 5f);
+        shieldRt.offsetMax = new Vector2(-5f, -5f);
         shieldFill = shieldRt.gameObject.AddComponent<Image>();
         shieldFill.sprite = art.UI("white");
         shieldFill.color = new Color(0.48f, 0.78f, 1f, 0.9f);
         shieldFill.raycastTarget = false;
         shieldFill.enabled = false;
 
-        hpText = TextAt(root, "120 / 120", 18, Color.white, TextAnchor.MiddleCenter,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(232f, -45f),
-            new Vector2(300f, 24f), art.Sans, true);
+        hpText = TextAt(root, "120 / 120", 30, Color.white, TextAnchor.MiddleCenter,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0.5f, 0.5f), new Vector2(292f, -56f),
+            new Vector2(380f, 38f), art.Sans, true);
+        hpText.fontStyle = FontStyle.Bold;
 
-        shieldText = TextAt(root, "", 16, new Color(0.55f, 0.8f, 1f), TextAnchor.MiddleLeft,
-            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(84f, -60f),
-            new Vector2(300f, 22f), art.Sans, true);
+        shieldText = TextAt(root, "", 20, new Color(0.55f, 0.8f, 1f), TextAnchor.MiddleLeft,
+            new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(104f, -80f),
+            new Vector2(370f, 24f), art.Sans, true);
+        shieldText.fontStyle = FontStyle.Bold;
 
         roomText = TextAt(root, "КОМНАТА 1 / 12", 25, Pal.Gold, TextAnchor.MiddleCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -24f),
-            new Vector2(800f, 34f), art.Serif, true);
+            new Vector2(620f, 34f), art.Serif, true);
         roomSub = TextAt(root, "", 17, new Color(0.84f, 0.78f, 0.68f), TextAnchor.MiddleCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -56f),
-            new Vector2(900f, 26f), art.Sans, true);
+            new Vector2(620f, 26f), art.Sans, true);
 
         var statsBg = Img(root, art.UI("ui_panel_dark", new Vector4(16f, 16f, 16f, 16f)),
             new Color(1f, 1f, 1f, 0.72f), new Vector2(1f, 1f), new Vector2(1f, 1f),
@@ -1923,7 +1933,17 @@ public class UIRoot : MonoBehaviour
         fadeImage = FullImage("Fade", art.UI("white"), new Color(0f, 0f, 0f, 0f));
         fadeImage.raycastTarget = false;
 
-        var wipeRt = MakeRect("Wipe", Canvas.transform, new Vector2(0.5f, 0.5f),
+        wipeBackRt = MakeRect("WipeBack", Canvas.transform, new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(3200f, 0f),
+            new Vector2(2850f, 1650f));
+        wipeBackRt.localRotation = Quaternion.Euler(0f, 0f, 4f);
+        wipeBackImage = wipeBackRt.gameObject.AddComponent<Image>();
+        wipeBackImage.sprite = art.UI("white");
+        wipeBackImage.color = new Color(0.06f, 0.035f, 0.05f, 0.96f);
+        wipeBackImage.raycastTarget = false;
+        wipeBackRt.gameObject.SetActive(false);
+
+        wipeRt = MakeRect("Wipe", Canvas.transform, new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(3000f, 0f),
             new Vector2(2600f, 1500f));
         wipeRt.localRotation = Quaternion.Euler(0f, 0f, -7f);
@@ -1931,7 +1951,24 @@ public class UIRoot : MonoBehaviour
         wipeImage.sprite = art.UI("white");
         wipeImage.color = new Color(0.91f, 0.85f, 0.72f);
         wipeImage.raycastTarget = false;
+
+        var edgeRt = MakeRect("edge", wipeRt, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 1500f));
+        var edge = edgeRt.gameObject.AddComponent<Image>();
+        edge.sprite = art.UI("white");
+        edge.color = new Color(0.32f, 0.16f, 0.08f, 0.85f);
+        edge.raycastTarget = false;
         wipeRt.gameObject.SetActive(false);
+
+        // Атмосферные слои рисуются под HUD, а меню, перки и экранные
+        // вспышки/занавес остаются поверх него.
+        if (hudGroup != null)
+        {
+            cool.transform.SetSiblingIndex(0);
+            vignette.transform.SetSiblingIndex(1);
+            lowHpImage.transform.SetSiblingIndex(2);
+            grainImage.transform.SetSiblingIndex(3);
+        }
     }
 
     public void Flash(Color color, float duration = 0.25f)
@@ -1979,21 +2016,43 @@ public class UIRoot : MonoBehaviour
 
     public IEnumerator Wipe(bool covered, float duration)
     {
-        var rt = wipeImage.rectTransform;
+        if (wipeRt == null || wipeImage == null) yield break;
         wipeImage.gameObject.SetActive(true);
-        float start = covered ? 2900f : 0f;
-        float end = covered ? 0f : -2900f;
-        rt.anchoredPosition = new Vector2(start, 0f);
+        if (wipeBackRt != null) wipeBackRt.gameObject.SetActive(true);
+
+        float start = covered ? 3000f : 0f;
+        float end = covered ? 0f : -3100f;
+        float backStart = covered ? 3260f : 120f;
+        float backEnd = covered ? 120f : -3300f;
+        wipeRt.anchoredPosition = new Vector2(start, 0f);
+        if (wipeBackRt != null) wipeBackRt.anchoredPosition = new Vector2(backStart, 0f);
+
         float t = 0f;
         while (t < duration)
         {
             t += Time.unscaledDeltaTime;
-            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / duration));
-            rt.anchoredPosition = new Vector2(Mathf.Lerp(start, end, k), 0f);
+            float raw = Mathf.Clamp01(t / duration);
+            float k = Mathf.SmoothStep(0f, 1f, raw);
+            float backK = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((raw - 0.08f) / 0.92f));
+            wipeRt.anchoredPosition = new Vector2(Mathf.Lerp(start, end, k), 0f);
+            if (wipeBackRt != null)
+            {
+                wipeBackRt.anchoredPosition = new Vector2(Mathf.Lerp(backStart, backEnd, backK), 0f);
+            }
+            float pulse = 1f + Mathf.Sin(raw * Mathf.PI) * 0.035f;
+            wipeRt.localScale = new Vector3(pulse, pulse, 1f);
             yield return null;
         }
-        rt.anchoredPosition = new Vector2(end, 0f);
-        if (!covered) wipeImage.gameObject.SetActive(false);
+
+        wipeRt.anchoredPosition = new Vector2(end, 0f);
+        wipeRt.localScale = Vector3.one;
+        if (wipeBackRt != null) wipeBackRt.anchoredPosition = new Vector2(backEnd, 0f);
+        if (!covered)
+        {
+            wipeImage.gameObject.SetActive(false);
+            if (wipeBackRt != null) wipeBackRt.gameObject.SetActive(false);
+        }
+        yield break;
     }
 
     // ------------------------------------------------------------------ обновление

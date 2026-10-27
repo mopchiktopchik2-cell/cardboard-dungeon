@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.3");
+        Debug.Log("[SelfTest] begin v1.3.2");
 
         CheckSkills();
         CheckPerks();
@@ -80,13 +80,87 @@ public static class SelfTest
         Check(Data.SkillAllowedForClass("shield", HeroClass.Swordsman), "shield is available to knight");
         Check(!Data.SkillAllowedForClass("shield", HeroClass.Mage), "mage cannot learn shield");
         Check(!Data.SkillAllowedForClass("shield", HeroClass.Ranger), "ranger cannot learn shield");
-        Check(Data.SkillAllowedForClass("frost", HeroClass.Ranger), "other skills stay available across classes");
+        Check(Data.SkillAllowedForClass("fireball", HeroClass.Mage), "fireball is available to mage");
+        Check(!Data.SkillAllowedForClass("fireball", HeroClass.Swordsman), "swordsman cannot learn fireball");
+        Check(!Data.SkillAllowedForClass("fireball", HeroClass.Ranger), "ranger cannot learn fireball");
+        Check(Data.SkillAllowedForClass("cleave", HeroClass.Swordsman), "cleave is available to swordsman");
+        Check(!Data.SkillAllowedForClass("cleave", HeroClass.Mage), "mage cannot learn cleave");
+        Check(!Data.SkillAllowedForClass("cleave", HeroClass.Ranger), "ranger cannot learn cleave");
+        Check(Data.SkillAllowedForClass("volley", HeroClass.Ranger), "volley is available to ranger");
+        Check(!Data.SkillAllowedForClass("volley", HeroClass.Mage), "mage cannot learn volley");
+        Check(!Data.SkillAllowedForClass("volley", HeroClass.Swordsman), "swordsman cannot learn volley");
+        Check(!Data.SkillAllowedForClass("frost", HeroClass.Ranger), "ranger cannot learn frost");
+        Check(Data.SkillAllowedForClass("heal", HeroClass.Mage) &&
+              Data.SkillAllowedForClass("heal", HeroClass.Swordsman) &&
+              Data.SkillAllowedForClass("heal", HeroClass.Ranger), "heal is shared by all classes");
+        Check(Data.SkillAllowedForClass("golem", HeroClass.Mage) &&
+              Data.SkillAllowedForClass("golem", HeroClass.Swordsman) &&
+              Data.SkillAllowedForClass("golem", HeroClass.Ranger), "golem is shared by all classes");
+        Check(ClassSkillCount(HeroClass.Mage) >= 5, "mage has enough skills for all slots");
+        Check(ClassSkillCount(HeroClass.Swordsman) >= 5, "swordsman has enough skills for all slots");
+        Check(ClassSkillCount(HeroClass.Ranger) >= 5, "ranger has enough skills for all slots");
         Check(Data.PerkAllowedForClass("shieldstart", HeroClass.Swordsman),
             "barrier perk is available to knight");
         Check(!Data.PerkAllowedForClass("shieldstart", HeroClass.Mage),
             "mage cannot take the shield barrier");
         Check(!Data.PerkAllowedForClass("shieldstart", HeroClass.Ranger),
             "ranger cannot take the shield barrier");
+        Check(Data.PerkAllowedForClass("cdr", HeroClass.Mage), "cast speed perk is available to mage");
+        Check(!Data.PerkAllowedForClass("cdr", HeroClass.Swordsman), "swordsman cannot take cast speed");
+        Check(!Data.PerkAllowedForClass("cdr", HeroClass.Ranger), "ranger cannot take cast speed");
+        Check(Data.PerkAllowedForClass("pierce", HeroClass.Ranger), "pierce is available to ranger");
+        Check(!Data.PerkAllowedForClass("pierce", HeroClass.Mage), "mage cannot take pierce");
+        Check(!Data.PerkAllowedForClass("pierce", HeroClass.Swordsman), "swordsman cannot take pierce");
+        Check(Data.PerkAllowedForClass("thorns", HeroClass.Swordsman), "thorns are available to swordsman");
+        Check(!Data.PerkAllowedForClass("thorns", HeroClass.Mage), "mage cannot take thorns");
+        Check(!Data.PerkAllowedForClass("thorns", HeroClass.Ranger), "ranger cannot take thorns");
+        Check(ClassPerkCount(HeroClass.Mage) >= 3, "mage has enough perk choice");
+        Check(ClassPerkCount(HeroClass.Swordsman) >= 3, "swordsman has enough perk choice");
+        Check(ClassPerkCount(HeroClass.Ranger) >= 3, "ranger has enough perk choice");
+        CheckAllSkillPools();
+    }
+
+    private static int ClassSkillCount(HeroClass hero)
+    {
+        int count = 0;
+        foreach (var skill in Data.Skills)
+        {
+            if (Data.SkillAllowedForClass(skill.Id, hero)) count++;
+        }
+        return count;
+    }
+
+    private static int ClassPerkCount(HeroClass hero)
+    {
+        int count = 0;
+        foreach (var perk in Data.Perks)
+        {
+            if (Data.PerkAllowedForClass(perk.Id, hero)) count++;
+        }
+        return count;
+    }
+
+    private static void CheckAllSkillPools()
+    {
+        HeroClass[] heroes = { HeroClass.Mage, HeroClass.Swordsman, HeroClass.Ranger };
+        foreach (var skill in Data.Skills)
+        {
+            bool any = false;
+            foreach (var hero in heroes)
+            {
+                if (Data.SkillAllowedForClass(skill.Id, hero)) any = true;
+            }
+            Check(any, "skill belongs to no class: " + skill.Id);
+        }
+        foreach (var perk in Data.Perks)
+        {
+            bool any = false;
+            foreach (var hero in heroes)
+            {
+                if (Data.PerkAllowedForClass(perk.Id, hero)) any = true;
+            }
+            Check(any, "perk belongs to no class: " + perk.Id);
+        }
     }
 
     private static void CheckPerks()
@@ -278,12 +352,16 @@ public static class SelfTest
         Check(Data.Enemy(EnemyKind.Spider).Special == "web_spit", "spider has a web ability");
         Check(Data.Enemy(EnemyKind.PlagueDoctor).Special == "plague_pool", "plague doctor leaves a pool");
         Check(Data.Enemy(EnemyKind.Hound).Special == "pounce", "hound has a pounce");
+        Check(Data.Enemy(EnemyKind.Hound).Range <= 1.3f, "hound closes to melee instead of holding range");
+        Check(Data.Enemy(EnemyKind.Hound).Range < Data.Enemy(EnemyKind.Guard).Range,
+            "hound is a melee enemy, guard keeps a charge range");
     }
 
     private static void CheckRooms()
     {
         Check(Data.RoomCount == 12, "room count = 12");
         Check(Data.Rooms.Length == Data.RoomCount, "room defs match RoomCount");
+        Check(Mathf.Approximately(Data.RoomTransitionHeal, 0.20f), "room transition heals 20% max hp");
 
         var allNames = new HashSet<string>();
         var allThemes = new HashSet<string>();

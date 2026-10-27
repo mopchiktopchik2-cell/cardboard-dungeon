@@ -23,6 +23,7 @@ public class Projectile : MonoBehaviour
     private float scale;
     private Vector2 dir;
     private SpriteRenderer sr;
+    private SpriteRenderer glow;
     private float trailTimer;
     private float homingTimer;
     private Enemy homingTarget;
@@ -44,11 +45,27 @@ public class Projectile : MonoBehaviour
     public static void Enemy(Vector2 pos, Vector2 direction, float dmg, float spd, string sprite, float scale = 1f,
         float radiusValue = 0.22f, float lifetime = 4f, bool poisonOnHit = false, bool slowOnHit = false)
     {
-        var p = Create(pos, direction, dmg, spd, sprite, Color.white, scale, lifetime);
+        var p = Create(pos, direction, dmg, spd, sprite, EnemyTint(sprite), scale, lifetime);
         p.enemyTeam = true;
         p.radius = radiusValue;
         p.enemyPoison = poisonOnHit;
         p.enemySlow = slowOnHit;
+    }
+
+    private static Color EnemyTint(string sprite)
+    {
+        switch (sprite)
+        {
+            case "proj_arrow": return new Color(1f, 0.82f, 0.32f);
+            case "proj_bone": return new Color(0.95f, 0.86f, 0.66f);
+            case "proj_skull": return new Color(0.78f, 0.65f, 1f);
+            case "proj_soul": return new Color(0.45f, 0.9f, 1f);
+            case "proj_poison": return new Color(0.55f, 1f, 0.42f);
+            case "proj_web": return new Color(0.85f, 0.92f, 1f);
+            case "proj_ice": return new Color(0.5f, 0.9f, 1f);
+            case "proj_fire": return new Color(1f, 0.48f, 0.2f);
+            default: return new Color(1f, 0.58f, 0.32f);
+        }
     }
 
     private static Projectile Create(Vector2 pos, Vector2 direction, float dmg, float spd, string sprite, Color color,
@@ -58,8 +75,19 @@ public class Projectile : MonoBehaviour
         go.transform.position = pos;
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = Game.I.Art.World(sprite);
-        sr.color = color;
-        sr.sortingOrder = 1450;
+        Color bright = Color.Lerp(color, Color.white, 0.18f);
+        sr.color = bright;
+        sr.sortingOrder = 1520;
+        var glowGo = new GameObject("glow");
+        glowGo.transform.SetParent(go.transform, false);
+        glowGo.transform.localScale = Vector3.one * 1.7f;
+        var glowSr = glowGo.AddComponent<SpriteRenderer>();
+        glowSr.sprite = Game.I.Art.World("fx_glow");
+        Color halo = Color.Lerp(bright, Color.white, 0.45f);
+        halo.a = 0.38f;
+        glowSr.color = halo;
+        glowSr.sortingOrder = 1505;
+
         var p = go.AddComponent<Projectile>();
         p.enemyTeam = false;
         p.damage = dmg;
@@ -68,9 +96,10 @@ public class Projectile : MonoBehaviour
         p.life = lifetime;
         p.dir = direction.normalized;
         p.spriteName = sprite;
-        p.tint = color;
+        p.tint = bright;
         p.scale = scaleValue;
         p.sr = sr;
+        p.glow = glowSr;
         go.transform.localScale = Vector3.one * scaleValue;
         go.transform.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
         return p;
@@ -121,6 +150,13 @@ public class Projectile : MonoBehaviour
             return;
         }
 
+        if (glow != null)
+        {
+            Color halo = Color.Lerp(tint, Color.white, 0.45f);
+            halo.a = 0.3f + Mathf.Sin(Time.time * 15f) * 0.1f;
+            glow.color = halo;
+        }
+
         if (homing)
         {
             homingTimer -= dt;
@@ -153,8 +189,8 @@ public class Projectile : MonoBehaviour
         if (trailTimer <= 0f)
         {
             trailTimer = 0.055f;
-            Game.I.Fx.Sprite(spriteName, transform.position, scale * 0.55f, 0.14f,
-                new Color(tint.r, tint.g, tint.b, 0.35f), 1440, 0f, 0f, 0f, false);
+            Game.I.Fx.Sprite(spriteName, transform.position, scale * 0.62f, 0.16f,
+                new Color(tint.r, tint.g, tint.b, 0.55f), 1480, 0f, 0f, 0f, false);
         }
 
         if (enemyTeam)
