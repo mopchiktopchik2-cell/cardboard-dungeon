@@ -155,7 +155,11 @@ public class RunManager : MonoBehaviour
 
     public void OnRoomCleared()
     {
-        if (Endless) CoinPickup.CollectAll();
+        if (Endless)
+        {
+            CoinPickup.CollectAll();
+            AddCoins(EndlessContent.RoomClearBonus(RoomIndex));
+        }
         var p = Game.I.Player;
         if (p.Stats.roomHeal > 0f)
         {

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Процедурный звук для «Картонного подземелья»: SFX и два музыкальных лупа."""
+"""Процедурный звук для «Картонного подземелья»: SFX и музыкальные лупы."""
 import math
 from pathlib import Path
 
@@ -74,6 +74,13 @@ def delay(x, time, gain, repeats=3):
             break
         out[d * i:] += x[:-d * i] * g
     return out
+
+
+def add_at(dst, start, src, gain=1.0):
+    if start < 0 or start >= len(dst) or len(src) == 0:
+        return
+    n = min(len(src), len(dst) - start)
+    dst[start:start + n] += src[:n] * gain
 
 
 def soft(x, drive=1.0):
@@ -389,10 +396,114 @@ def music_boss():
     save("music_boss", x, 0.6)
 
 
+def music_combat():
+    """Энергичный боевой луп: быстрый пульс, бас, арпеджио и тревожный мотив."""
+    bpm = 126
+    beat = 60 / bpm
+    bars = 16
+    dur = bars * 4 * beat
+    n = int(SR * dur)
+    x = np.zeros(n)
+    roots = (73.42, 58.27, 87.31, 65.41)  # Dm, Bb, F, C
+    chord_ratios = (1.0, 1.189, 1.5, 2.0)
+    arp_pattern = (1.0, 1.5, 2.0, 1.189, 1.5, 2.0, 1.189, 1.5)
+    scale = (587.33, 523.25, 466.16, 392.0, 440.0, 523.25, 587.33, 698.46)
+
+    def bass_note(freq, length, amp):
+        n2 = int(SR * length)
+        tt = np.arange(n2) / SR
+        wave = (np.sin(2 * np.pi * freq * tt) +
+                0.32 * np.sin(4 * np.pi * freq * tt) +
+                0.14 * np.sin(6 * np.pi * freq * tt))
+        return wave * env_exp(n2, 7.5) * amp
+
+    def chord_stab(freq, length, amp):
+        n2 = int(SR * length)
+        tt = np.arange(n2) / SR
+        wave = np.zeros(n2)
+        for ratio in chord_ratios:
+            wave += np.sin(2 * np.pi * freq * ratio * tt)
+        wave /= len(chord_ratios)
+        attack = np.minimum(1.0, tt / 0.012)
+        return wave * attack * np.exp(-tt * 4.2) * amp
+
+    def snare(seed):
+        length = 0.18
+        n2 = int(SR * length)
+        body = sine(190, length) * env_exp(n2, 24) * 0.16
+        noise_part = highpass(noise(length, seed), 1500) * env_exp(n2, 32) * 0.46
+        return body + noise_part
+
+    def hat(seed, length=0.045, amp=0.12):
+        n2 = int(SR * length)
+        return highpass(noise(length, seed), 6500) * env_exp(n2, 42) * amp
+
+    for bar in range(bars):
+        root = roots[(bar // 4) % 4]
+        st = int(SR * bar * 4 * beat)
+
+        # Удар на начало такта и редкий crash на границе фразы.
+        add_at(x, st, thump(0.5, 92, 30, 0.9), 0.42)
+        if bar % 4 == 0:
+            crash = highpass(noise(1.3, 300 + bar), 3200) * env_exp(int(SR * 1.3), 3.2) * 0.16
+            add_at(x, st, crash, 0.8)
+
+        # Четыре удара бочки плюс синкопа во второй половине такта.
+        for b in (0, 1, 2, 3):
+            add_at(x, st + int(SR * b * beat), thump(0.24, 126, 42, 0.9), 0.44)
+        if bar % 2 == 1:
+            add_at(x, st + int(SR * 3.5 * beat), thump(0.2, 105, 38, 0.7), 0.28)
+
+        # Малый барабан на 2 и 4.
+        for b in (1, 3):
+            add_at(x, st + int(SR * b * beat), snare(410 + bar * 8 + b), 0.52)
+
+        # Восьмые хэты и тихие шестнадцатые между ними.
+        for b in range(8):
+            add_at(x, st + int(SR * b * beat / 2), hat(510 + bar * 13 + b), 0.9)
+        for b in range(0, 8, 2):
+            add_at(x, st + int(SR * (b + 0.75) * beat / 2), hat(720 + bar * 17 + b, 0.035, 0.06), 0.8)
+
+        # Басовая остинатная фигура.
+        bass_steps = (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5)
+        bass_ratios = (1.0, 1.0, 1.5, 1.0, 1.0, 2.0, 1.5, 1.0)
+        for step, ratio in zip(bass_steps, bass_ratios):
+            add_at(x, st + int(SR * step * beat), bass_note(root * ratio, 0.22, 0.36), 0.9)
+
+        # Короткие аккордовые удары на слабых долях.
+        for b in (0.0, 1.5, 2.5):
+            add_at(x, st + int(SR * b * beat), chord_stab(root * 2, 0.7, 0.16), 0.9)
+
+        # Арпеджио шестнадцатыми.
+        for step in range(16):
+            ratio = arp_pattern[step % len(arp_pattern)]
+            note = pluck(root * 4 * ratio, 0.32, 0.075)
+            add_at(x, st + int(SR * step * beat / 4), note, 0.9)
+
+        # Тревожный мотив во второй половине фразы.
+        if bar % 2 == 1:
+            for i, freq in enumerate(scale):
+                add_at(x, st + int(SR * i * beat / 2), pluck(freq, 0.38, 0.08), 0.9)
+
+        # Короткий fill перед следующей фразой.
+        if bar % 4 == 3:
+            for i in range(4):
+                fill = thump(0.12, 180 - i * 22, 70 - i * 8, 0.6)
+                add_at(x, st + int(SR * (3.0 + i * 0.22) * beat), fill, 0.5)
+
+    wet = delay(x, 0.23, 0.18, 3)
+    x = x * 0.82 + wet * 0.24
+    fade = int(SR * 0.03)
+    x[:fade] *= np.linspace(0, 1, fade)
+    x[-fade:] *= np.linspace(1, 0, fade)
+    save("music_combat", x, 0.68)
+
+
 if __name__ == "__main__":
     sfx()
     music_dungeon()
     music_boss()
+    music_combat()
     print("audio:", len(list(OUT.glob("*.wav"))), "files")
     for f in sorted(OUT.glob("*.wav")):
         print(f.name, round(f.stat().st_size / 1024), "KB")

@@ -33,6 +33,10 @@ public class UIRoot : MonoBehaviour
     private CanvasGroup bannerGroup;
     private CanvasGroup equipGroup;
     private CanvasGroup settingsGroup;
+    private CanvasGroup heroPageGroup;
+    private CanvasGroup dungeonPageGroup;
+    private CanvasGroup endlessPageGroup;
+    private CanvasGroup activeMenuPage;
 
     private RectTransform perkCardsRoot;
     private RectTransform menuRoot;
@@ -49,6 +53,9 @@ public class UIRoot : MonoBehaviour
     private Text menuClassDesc;
     private Text menuDungeonTitle;
     private Text menuDungeonStats;
+    private Text heroPageHint;
+    private Text dungeonPageHint;
+    private Text endlessPageHint;
     private Text equipHint;
     private Text endLoot;
     private RectTransform endLootCard;
@@ -64,6 +71,9 @@ public class UIRoot : MonoBehaviour
     private readonly List<Image> classFrames = new List<Image>();
     private readonly List<Image> classIcons = new List<Image>();
     private readonly List<Image> classAccents = new List<Image>();
+    private readonly List<Image> endlessClassFrames = new List<Image>();
+    private readonly List<Image> endlessClassIcons = new List<Image>();
+    private readonly List<Image> endlessClassAccents = new List<Image>();
     private readonly List<Image> dungeonFrames = new List<Image>();
     private readonly List<Image> dungeonIcons = new List<Image>();
     private readonly List<Image> dungeonAccents = new List<Image>();
@@ -354,55 +364,13 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.4.0", 20, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.5.0", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
         Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.85f),
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -272f), new Vector2(680f, 42f), false);
-
-        TextAt(menuRoot, "ГЕРОЙ", 19, new Color(0.86f, 0.75f, 0.58f), TextAnchor.MiddleLeft,
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(-415f, 185f), new Vector2(380f, 28f), art.Serif, true);
-        TextAt(menuRoot, "ПОДЗЕМЕЛЬЕ", 19, new Color(0.86f, 0.75f, 0.58f), TextAnchor.MiddleLeft,
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(415f, 185f), new Vector2(380f, 28f), art.Serif, true);
-
-        for (int i = 0; i < Data.HeroClasses.Count; i++)
-        {
-            var hero = Data.HeroClasses[i];
-            var frameImg = MakeMenuCard(menuRoot, new Vector2(-415f, 120f - i * 104f), hero.Sprite,
-                hero.Name, hero.Title, ClassFoot(hero), hero.Accent, new Color(0.82f, 0.78f, 0.7f),
-                () => SelectClass(hero.Id), out var icon, out var accent);
-            classFrames.Add(frameImg);
-            classIcons.Add(icon);
-            classAccents.Add(accent);
-        }
-
-        for (int i = 0; i < Data.Dungeons.Count; i++)
-        {
-            var dungeon = Data.Dungeons[i];
-            string foot = "СЛОЖНОСТЬ: " + Data.DifficultyName(dungeon.Difficulty) +
-                          " · ДОБЫЧА " + Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
-            int dungeonIndex = i;
-            var frameImg = MakeMenuCard(menuRoot, new Vector2(415f, 120f - i * 104f), "ui_dungeon_" + dungeon.Id,
-                dungeon.Name, dungeon.Tagline, foot, dungeon.Accent, Data.DifficultyColor(dungeon.Difficulty),
-                () => SelectDungeon(dungeonIndex), out var icon, out var accent);
-            dungeonFrames.Add(frameImg);
-            dungeonIcons.Add(icon);
-            dungeonAccents.Add(accent);
-            dungeonButtons.Add(frameImg.GetComponent<Button>());
-
-            var lockBg = Img(frameImg.rectTransform, art.UI("white"), new Color(0.035f, 0.02f, 0.045f, 0.78f),
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
-            TextAt(lockBg.rectTransform, "ЗАКРЫТО\n<size=11>победи в предыдущем</size>", 16,
-                new Color(0.95f, 0.58f, 0.48f), TextAnchor.MiddleCenter,
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero,
-                art.Serif, true);
-            lockBg.gameObject.SetActive(false);
-            dungeonLocks.Add(lockBg.gameObject);
-        }
 
         var summary = Img(menuRoot, art.UI("ui_card_dark", new Vector4(22f, 22f, 22f, 22f)),
             new Color(1f, 1f, 1f, 0.88f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -431,22 +399,23 @@ public class UIRoot : MonoBehaviour
             TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -188f), new Vector2(390f, 36f), art.Sans, true);
 
-        MakeButton(menuRoot, "СПУСТИТЬСЯ", new Vector2(0f, -232f), new Vector2(430f, 64f),
-            () => Game.I.StartRun(), 29);
-
-        MakeButton(menuRoot, "БЕСКОНЕЧНЫЙ РАЗЛОМ", new Vector2(415f, -196f), new Vector2(380f, 54f),
-            () => Game.I.StartEndlessRun(), 20, false);
+        MakeButton(menuRoot, "ГЕРОИ", new Vector2(-360f, -210f), new Vector2(330f, 58f),
+            ShowHeroPage, 23, false);
+        MakeButton(menuRoot, "ПОДЗЕМЕЛЬЯ", new Vector2(0f, -210f), new Vector2(330f, 58f),
+            ShowDungeonPage, 23);
+        MakeButton(menuRoot, "РАЗЛОМ", new Vector2(360f, -210f), new Vector2(330f, 58f),
+            ShowEndlessPage, 23, false);
         menuEndlessBest = TextAt(menuRoot, "", 13, new Color(0.78f, 0.62f, 0.95f), TextAnchor.MiddleCenter,
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(415f, -232f), new Vector2(380f, 22f), art.Sans, true);
+            new Vector2(360f, -270f), new Vector2(380f, 22f), art.Sans, true);
 
-        MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-255f, -314f), new Vector2(160f, 46f),
+        MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-255f, -338f), new Vector2(160f, 46f),
             ShowEquipment, 16, false);
-        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(-85f, -314f), new Vector2(160f, 46f),
+        MakeButton(menuRoot, "КАК ИГРАТЬ", new Vector2(-85f, -338f), new Vector2(160f, 46f),
             ToggleHelp, 16, false);
-        MakeButton(menuRoot, "НАСТРОЙКИ", new Vector2(85f, -314f), new Vector2(160f, 46f),
+        MakeButton(menuRoot, "НАСТРОЙКИ", new Vector2(85f, -338f), new Vector2(160f, 46f),
             ShowSettings, 16, false);
-        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(255f, -314f), new Vector2(160f, 46f),
+        MakeButton(menuRoot, "ВЫЙТИ", new Vector2(255f, -338f), new Vector2(160f, 46f),
             () => Game.I.QuitGame(), 16, false);
 
         for (int i = 0; i < 24; i++)
@@ -470,9 +439,153 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 33f),
             new Vector2(1120f, 28f), art.Sans, true);
 
+        BuildMenuPages();
         BuildHelp();
         RefreshMenuSelection();
     }
+
+    private void BuildMenuPages()
+    {
+        heroPageGroup = BuildMenuPage("MenuHeroes", "ГЕРОИ", "ВЫБЕРИ КЛАСС ДЛЯ ПОДЗЕМЕЛЬЯ", out var heroRoot);
+        BuildClassCards(heroRoot, classFrames, classIcons, classAccents);
+        heroPageHint = TextAt(heroRoot, "", 15, new Color(0.82f, 0.78f, 0.7f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -202f), new Vector2(760f, 24f), art.Sans, true);
+        MakeButton(heroRoot, "НАЗАД", new Vector2(-190f, -275f), new Vector2(280f, 56f),
+            BackToMainMenu, 21, false);
+        MakeButton(heroRoot, "К ПОДЗЕМЕЛЬЯМ", new Vector2(190f, -275f), new Vector2(340f, 56f),
+            ShowDungeonPage, 21);
+
+        dungeonPageGroup = BuildMenuPage("MenuDungeons", "ПОДЗЕМЕЛЬЯ", "ВЫБЕРИ, КУДА СПУСТИТЬСЯ", out var dungeonRoot);
+        BuildDungeonCards(dungeonRoot);
+        dungeonPageHint = TextAt(dungeonRoot, "", 15, new Color(0.82f, 0.78f, 0.7f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -202f), new Vector2(760f, 24f), art.Sans, true);
+        MakeButton(dungeonRoot, "НАЗАД", new Vector2(-190f, -275f), new Vector2(280f, 56f),
+            BackToMainMenu, 21, false);
+        MakeButton(dungeonRoot, "СПУСТИТЬСЯ", new Vector2(190f, -275f), new Vector2(340f, 56f),
+            () => Game.I.StartRun(), 23);
+
+        endlessPageGroup = BuildMenuPage("MenuEndless", "БЕСКОНЕЧНЫЙ РАЗЛОМ",
+            "ВЫБЕРИ КЛАСС ДЛЯ РАЗЛОМА", out var endlessRoot);
+        BuildClassCards(endlessRoot, endlessClassFrames, endlessClassIcons, endlessClassAccents);
+        endlessPageHint = TextAt(endlessRoot, "", 15, new Color(0.82f, 0.78f, 0.7f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -202f), new Vector2(760f, 24f), art.Sans, true);
+        MakeButton(endlessRoot, "НАЗАД", new Vector2(-190f, -275f), new Vector2(280f, 56f),
+            BackToMainMenu, 21, false);
+        MakeButton(endlessRoot, "НАЧАТЬ РАЗЛОМ", new Vector2(190f, -275f), new Vector2(340f, 56f),
+            () => Game.I.StartEndlessRun(), 21);
+    }
+
+    private CanvasGroup BuildMenuPage(string name, string title, string subtitle, out RectTransform root)
+    {
+        var group = NewGroup(name);
+        root = group.GetComponent<RectTransform>();
+
+        var backdrop = Img(root, art.UI("ui_menu_bg"), Color.white,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+        backdrop.preserveAspect = false;
+        backdrop.raycastTarget = true;
+        var frame = Img(root, art.UI("ui_menu_frame"), Color.white,
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+        frame.raycastTarget = false;
+
+        TextAt(root, title, 44, Pal.Gold, TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -70f), new Vector2(800f, 60f), art.Serif, true);
+        TextAt(root, subtitle, 19, new Color(0.84f, 0.74f, 0.58f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -136f), new Vector2(800f, 28f), art.Sans, true);
+        Img(root, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.85f),
+            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+            new Vector2(0f, -172f), new Vector2(680f, 42f), false);
+        SetGroup(group, false);
+        return group;
+    }
+
+    private void BuildClassCards(Transform parent, List<Image> frames, List<Image> icons, List<Image> accents)
+    {
+        for (int i = 0; i < Data.HeroClasses.Count; i++)
+        {
+            var hero = Data.HeroClasses[i];
+            var frameImg = MakeMenuCard(parent, new Vector2(0f, 90f - i * 100f), hero.Sprite,
+                hero.Name, hero.Title, ClassFoot(hero), hero.Accent, new Color(0.82f, 0.78f, 0.7f),
+                () => SelectClass(hero.Id), out var icon, out var accent);
+            frames.Add(frameImg);
+            icons.Add(icon);
+            accents.Add(accent);
+        }
+    }
+
+    private void BuildDungeonCards(Transform parent)
+    {
+        for (int i = 0; i < Data.Dungeons.Count; i++)
+        {
+            var dungeon = Data.Dungeons[i];
+            string foot = "СЛОЖНОСТЬ: " + Data.DifficultyName(dungeon.Difficulty) +
+                          " · ДОБЫЧА " + Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
+            int dungeonIndex = i;
+            var frameImg = MakeMenuCard(parent, new Vector2(0f, 90f - i * 100f), "ui_dungeon_" + dungeon.Id,
+                dungeon.Name, dungeon.Tagline, foot, dungeon.Accent, Data.DifficultyColor(dungeon.Difficulty),
+                () => SelectDungeon(dungeonIndex), out var icon, out var accent);
+            dungeonFrames.Add(frameImg);
+            dungeonIcons.Add(icon);
+            dungeonAccents.Add(accent);
+            dungeonButtons.Add(frameImg.GetComponent<Button>());
+
+            var lockBg = Img(frameImg.rectTransform, art.UI("white"), new Color(0.035f, 0.02f, 0.045f, 0.78f),
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+            TextAt(lockBg.rectTransform, "ЗАКРЫТО\n<size=11>победи в предыдущем</size>", 16,
+                new Color(0.95f, 0.58f, 0.48f), TextAnchor.MiddleCenter,
+                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero,
+                art.Serif, true);
+            lockBg.gameObject.SetActive(false);
+            dungeonLocks.Add(lockBg.gameObject);
+        }
+    }
+
+    public void ShowHeroPage()
+    {
+        SetGroup(menuGroup, false);
+        SetGroup(dungeonPageGroup, false);
+        SetGroup(endlessPageGroup, false);
+        SetGroup(heroPageGroup, true);
+        activeMenuPage = heroPageGroup;
+        RefreshMenuSelection();
+    }
+
+    public void ShowDungeonPage()
+    {
+        SetGroup(menuGroup, false);
+        SetGroup(heroPageGroup, false);
+        SetGroup(endlessPageGroup, false);
+        SetGroup(dungeonPageGroup, true);
+        activeMenuPage = dungeonPageGroup;
+        RefreshMenuSelection();
+    }
+
+    public void ShowEndlessPage()
+    {
+        SetGroup(menuGroup, false);
+        SetGroup(heroPageGroup, false);
+        SetGroup(dungeonPageGroup, false);
+        SetGroup(endlessPageGroup, true);
+        activeMenuPage = endlessPageGroup;
+        RefreshMenuSelection();
+    }
+
+    public void BackToMainMenu()
+    {
+        SetGroup(heroPageGroup, false);
+        SetGroup(dungeonPageGroup, false);
+        SetGroup(endlessPageGroup, false);
+        SetGroup(menuGroup, true);
+        activeMenuPage = null;
+        RefreshMenuSelection();
+    }
+
+    public bool MenuSubpageOpen => activeMenuPage != null && activeMenuPage.gameObject.activeSelf;
 
     private static string ClassFoot(HeroClassDef hero)
     {
@@ -574,14 +687,8 @@ public class UIRoot : MonoBehaviour
         var hero = MetaProgress.SelectedHero;
         var dungeon = MetaProgress.SelectedDungeon;
 
-        for (int i = 0; i < classFrames.Count; i++)
-        {
-            bool selected = i == (int)MetaProgress.SelectedClass;
-            classFrames[i].color = selected ? Color.white : new Color(0.58f, 0.56f, 0.62f, 0.92f);
-            classIcons[i].color = selected ? Color.white : new Color(0.7f, 0.68f, 0.7f, 0.8f);
-            classAccents[i].color = new Color(Data.HeroClasses[i].Accent.r, Data.HeroClasses[i].Accent.g,
-                Data.HeroClasses[i].Accent.b, selected ? 1f : 0.25f);
-        }
+        RefreshClassCards(classFrames, classIcons, classAccents);
+        RefreshClassCards(endlessClassFrames, endlessClassIcons, endlessClassAccents);
         for (int i = 0; i < dungeonFrames.Count; i++)
         {
             bool selected = Data.Dungeons[i].Id == dungeon.Id;
@@ -645,6 +752,39 @@ public class UIRoot : MonoBehaviour
                 ? "РЕКОРД РАЗЛОМА: ГЛУБИНА " + best + "  ·  УБИТО " + kills
                 : "РЕКОРД РАЗЛОМА: ПОКА НЕТ";
         }
+        if (heroPageHint != null)
+        {
+            heroPageHint.text = "ВЫБРАН: " + hero.Name + "  ·  " + hero.Title;
+        }
+        if (dungeonPageHint != null)
+        {
+            dungeonPageHint.text = "ВЫБРАНО: " + dungeon.Name + "  ·  " +
+                                   Data.DifficultyName(dungeon.Difficulty);
+        }
+        if (endlessPageHint != null)
+        {
+            int best = MetaProgress.BestEndlessRoom;
+            endlessPageHint.text = "СТАРТ: " + EndlessContent.StartCoins + " МОНЕТ  ·  " +
+                                   (best > 0 ? "РЕКОРД: ГЛУБИНА " + best : "РЕКОРД: ПОКА НЕТ");
+        }
+    }
+
+    private void RefreshClassCards(List<Image> frames, List<Image> icons, List<Image> accents)
+    {
+        for (int i = 0; i < frames.Count && i < Data.HeroClasses.Count; i++)
+        {
+            bool selected = i == (int)MetaProgress.SelectedClass;
+            frames[i].color = selected ? Color.white : new Color(0.58f, 0.56f, 0.62f, 0.92f);
+            if (i < icons.Count)
+            {
+                icons[i].color = selected ? Color.white : new Color(0.7f, 0.68f, 0.7f, 0.8f);
+            }
+            if (i < accents.Count)
+            {
+                var accent = Data.HeroClasses[i].Accent;
+                accents[i].color = new Color(accent.r, accent.g, accent.b, selected ? 1f : 0.25f);
+            }
+        }
     }
 
     private void BuildHelp()
@@ -675,8 +815,9 @@ public class UIRoot : MonoBehaviour
             "<color=#E8C16D>1 2 3 4 5</color> — активные навыки. Перезарядка видна на слотах.\n\n" +
             "<color=#E8C16D>SPACE</color> — рывок. Короткая неуязвимость.\n\n" +
             "<color=#E8C16D>ESC</color> — пауза, настройки громкости и выход в меню.\n\n" +
-            "В меню выбери героя и одно из трёх подземелий. У каждого свой декор, враги и босс. " +
-            "После победы снаряжение может выпасть — чем выше сложность, тем лучше награда. " +
+            "В главном меню выбери раздел: «Герои» — класс, «Подземелья» — забег по сюжету, " +
+            "«Разлом» — бесконечный режим с отдельным выбором класса. У каждого подземелья свой декор, " +
+            "враги и босс. После победы снаряжение может выпасть — чем выше сложность, тем лучше награда. " +
             "Надетые предметы сохраняются между забегами.";
 
         TextAt(panelRt, body, 21, Pal.Cream, TextAnchor.UpperLeft,
@@ -712,6 +853,10 @@ public class UIRoot : MonoBehaviour
         SetGroup(settingsGroup, false);
         SetShopChrome(false);
         ResetLowHp();
+        SetGroup(heroPageGroup, false);
+        SetGroup(dungeonPageGroup, false);
+        SetGroup(endlessPageGroup, false);
+        activeMenuPage = null;
         SetGroup(menuGroup, true);
         SetGroup(hudGroup, false);
         SetGroup(perkGroup, false);
@@ -726,6 +871,10 @@ public class UIRoot : MonoBehaviour
     {
         SetGroup(equipGroup, false);
         SetGroup(settingsGroup, false);
+        SetGroup(heroPageGroup, false);
+        SetGroup(dungeonPageGroup, false);
+        SetGroup(endlessPageGroup, false);
+        activeMenuPage = null;
         SetGroup(menuGroup, false);
     }
 
@@ -2259,6 +2408,10 @@ public class UIRoot : MonoBehaviour
         if (helpPanel != null && helpPanel.gameObject.activeSelf && Input.GetKeyDown(KeyCode.Escape))
         {
             helpPanel.gameObject.SetActive(false);
+        }
+        else if (MenuSubpageOpen && Input.GetKeyDown(KeyCode.Escape))
+        {
+            BackToMainMenu();
         }
         if (hudGroup != null && hudGroup.gameObject.activeSelf)
         {

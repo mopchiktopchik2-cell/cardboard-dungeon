@@ -38,7 +38,7 @@ public static class EndlessContent
     public const int BossEvery = 5;
     public const int MaxSkillLevel = 5;
     public const int ShopOfferCount = 3;
-    public const int StartCoins = 25;
+    public const int StartCoins = 40;
 
     private static DungeonDef dungeon;
     private static List<string> themeIds;
@@ -184,20 +184,25 @@ public static class EndlessContent
     public static float EnemyHpScale(int index)
     {
         float depth = Mathf.Max(0, index);
-        return 1f + 0.11f * depth + 0.0025f * depth * depth;
+        return 1f + 0.085f * depth + 0.0012f * depth * depth;
     }
 
     public static float EnemyDamageScale(int index)
     {
         float depth = Mathf.Max(0, index);
-        return 1f + 0.065f * depth + 0.0008f * depth * depth;
+        return 1f + 0.045f * depth + 0.0004f * depth * depth;
     }
 
     public static int CoinDrop(bool boss, bool elite, int depth)
     {
-        if (boss) return 15 + depth;
-        if (elite) return 4 + depth / 3;
-        return Random.Range(1, 3) + depth / 6;
+        if (boss) return 30 + depth * 2;
+        if (elite) return 8 + depth / 2;
+        return Random.Range(2, 5) + depth / 4;
+    }
+
+    public static int RoomClearBonus(int depth)
+    {
+        return 5 + Mathf.Max(0, depth);
     }
 
     public static int UpgradeCost(int targetLevel, int depth)

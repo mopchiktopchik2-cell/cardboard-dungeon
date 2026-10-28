@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.4.0");
+        Debug.Log("[SelfTest] begin v1.5.0");
 
         CheckSkills();
         CheckPerks();
@@ -516,7 +516,7 @@ public static class SelfTest
 
         string[] audio =
         {
-            "sfx_hit", "sfx_shoot", "sfx_heal", "sfx_boss_roar", "music_dungeon", "music_boss"
+            "sfx_hit", "sfx_shoot", "sfx_heal", "sfx_boss_roar", "music_dungeon", "music_boss", "music_combat"
         };
         foreach (var a in audio)
         {
@@ -574,7 +574,7 @@ public static class SelfTest
         Check(EndlessContent.BossEvery == 5, "endless boss every 5 rooms");
         Check(EndlessContent.MaxSkillLevel == 5, "endless max skill level = 5");
         Check(EndlessContent.ShopOfferCount == 3, "endless shop has three offers");
-        Check(EndlessContent.StartCoins == 25, "endless starts with 25 coins");
+        Check(EndlessContent.StartCoins == 40, "endless starts with 40 coins");
 
         var dungeon = EndlessContent.Dungeon;
         Check(dungeon != null && dungeon.Id == EndlessContent.DungeonId, "endless dungeon exists");
@@ -637,11 +637,14 @@ public static class SelfTest
         Check(EndlessContent.EnemyHpScale(0) >= 0.999f, "endless first room hp scale starts at 1");
         Check(EndlessContent.EnemyDamageScale(0) >= 0.999f, "endless first room damage scale starts at 1");
 
-        Check(EndlessContent.CoinDrop(true, false, 10) == 25, "endless boss coin drop scales with depth");
-        Check(EndlessContent.CoinDrop(false, true, 10) == 7, "endless elite coin drop scales with depth");
+        Check(EndlessContent.CoinDrop(true, false, 10) == 50, "endless boss coin drop scales with depth");
+        Check(EndlessContent.CoinDrop(false, true, 10) == 13, "endless elite coin drop scales with depth");
         int normalCoins = 0;
         for (int i = 0; i < 32; i++) normalCoins += EndlessContent.CoinDrop(false, false, 0);
-        Check(normalCoins >= 32 && normalCoins <= 64, "endless normal enemies drop 1-2 coins");
+        Check(normalCoins >= 64 && normalCoins <= 128, "endless normal enemies drop 2-4 coins");
+        Check(EndlessContent.RoomClearBonus(0) == 5 &&
+              EndlessContent.RoomClearBonus(10) == 15,
+            "endless room clear bonus scales with depth");
 
         Check(EndlessContent.UpgradeCost(5, 0) > EndlessContent.UpgradeCost(4, 0) &&
               EndlessContent.UpgradeCost(4, 0) > EndlessContent.UpgradeCost(2, 0),

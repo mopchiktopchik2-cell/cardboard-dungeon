@@ -93,6 +93,7 @@ public class Game : MonoBehaviour
         ToMenu();
         if (QA && HasArg("-qaEquip")) StartCoroutine(QaEquipShot());
         else if (QA && HasArg("-qaSettingsShot")) StartCoroutine(QaSettingsShot());
+        else if (QA && HasArg("-qaMenuPages")) StartCoroutine(QaMenuPages());
         else if (QA && HasArg("-qaBossAttacks")) StartCoroutine(QaBossAttacks());
         else if (QA && HasArg("-qaEndless")) StartCoroutine(QaEndless());
         else if (QA && HasArg("-qaAudit")) StartCoroutine(QaAudit());
@@ -302,6 +303,49 @@ public class Game : MonoBehaviour
         Application.Quit();
     }
 
+    private IEnumerator QaMenuPages()
+    {
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+        MetaProgress.SelectedClass = HeroClass.Ranger;
+        MetaProgress.SelectedDungeonId = "crypt";
+        UI.ShowMenu();
+        yield return new WaitForSecondsRealtime(0.7f);
+        yield return QaShot(shotsDir, "menu_main");
+
+        UI.ShowHeroPage();
+        yield return new WaitForSecondsRealtime(0.5f);
+        yield return QaShot(shotsDir, "menu_heroes");
+
+        UI.ShowDungeonPage();
+        yield return new WaitForSecondsRealtime(0.5f);
+        yield return QaShot(shotsDir, "menu_dungeons");
+
+        UI.ShowEndlessPage();
+        yield return new WaitForSecondsRealtime(0.5f);
+        yield return QaShot(shotsDir, "menu_endless");
+
+        UI.SelectClass(HeroClass.Ranger);
+        yield return new WaitForSecondsRealtime(0.3f);
+        yield return QaShot(shotsDir, "menu_endless_ranger");
+
+        StartEndlessRun();
+        yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == 0, 6f);
+        bool classOk = Run != null && Run.Hero == HeroClass.Ranger;
+        bool skillOk = Skills != null && Skills.Slots[0].Def != null &&
+                       Data.SkillAllowedForClass(Skills.Slots[0].Def.Id, HeroClass.Ranger);
+        Debug.Log("[QaMenuPages] class=" + (Run != null ? Run.Hero.ToString() : "null") +
+                  " skill=" + (Skills != null && Skills.Slots[0].Def != null ? Skills.Slots[0].Def.Id : "null") +
+                  " classOk=" + classOk + " skillOk=" + skillOk);
+        if (!classOk || !skillOk)
+        {
+            Debug.LogError("[QaMenuPages] endless did not use selected class");
+        }
+        yield return QaShot(shotsDir, "endless_ranger_start");
+        yield return new WaitForSecondsRealtime(0.3f);
+        Application.Quit();
+    }
+
     private IEnumerator QaBossAttacks()
     {
         Player.QaInvincible = true;
@@ -353,7 +397,7 @@ public class Game : MonoBehaviour
         yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == 0, 6f);
         EndlessCheck("endless run starts", Run.Endless && Run.Dungeon != null &&
                                             Run.Dungeon.Id == EndlessContent.DungeonId);
-        EndlessCheck("endless starts with 25 coins", Run.Coins == EndlessContent.StartCoins);
+        EndlessCheck("endless starts with starting coins", Run.Coins == EndlessContent.StartCoins);
         yield return QaShot(shotsDir, "endless_room_01");
 
         for (int expected = 0; expected < 5; expected++)
@@ -678,7 +722,7 @@ public class Game : MonoBehaviour
             else if (State == GameState.Pause) ResumeGame();
         }
 
-        if (State == GameState.Menu && !UI.MenuOverlayOpen &&
+        if (State == GameState.Menu && !UI.MenuOverlayOpen && !UI.MenuSubpageOpen &&
             (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
         {
             StartRun();
@@ -774,7 +818,7 @@ public class Game : MonoBehaviour
         UI.HidePause();
         UI.ShowHud();
         Run.StartRun(false);
-        Audio.Music("music_dungeon", 0.8f);
+        Audio.Music("music_combat", 0.8f);
         flow = StartCoroutine(BeginRoom(0, true));
     }
 
@@ -788,7 +832,7 @@ public class Game : MonoBehaviour
         UI.HidePause();
         UI.ShowHud();
         Run.StartRun(true);
-        Audio.Music("music_dungeon", 0.8f);
+        Audio.Music("music_combat", 0.8f);
         flow = StartCoroutine(BeginRoom(0, true));
     }
 
@@ -821,7 +865,7 @@ public class Game : MonoBehaviour
         UI.ShowHud();
         bool endless = Run != null && Run.Endless;
         Run.StartRun(endless);
-        Audio.Music("music_dungeon", 0.6f);
+        Audio.Music("music_combat", 0.6f);
         flow = StartCoroutine(BeginRoom(0, true));
     }
 
@@ -1117,7 +1161,11 @@ public class Game : MonoBehaviour
             Cam.Shake(0.3f, 0.8f);
             yield return WaitReal(0.9f);
         }
-        else if (Run.Endless)
+        else if (room.Type == RoomType.Combat || room.Type == RoomType.Elite)
+        {
+            Audio.Music("music_combat", 0.8f);
+        }
+        else
         {
             Audio.Music("music_dungeon", 0.8f);
         }
