@@ -127,6 +127,17 @@ public class Projectile : MonoBehaviour
         }
     }
 
+    public static void ClearEnemyProjectiles()
+    {
+        var copy = new List<Projectile>(All);
+        foreach (var projectile in copy)
+        {
+            if (projectile == null || !projectile.enemyTeam) continue;
+            projectile.enabled = false;
+            Destroy(projectile.gameObject);
+        }
+    }
+
     private void Update()
     {
         if (Game.I == null)

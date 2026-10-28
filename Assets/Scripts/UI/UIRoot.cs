@@ -14,6 +14,7 @@ public class SlotView
     public Image Cooldown;
     public Text Key;
     public Text CooldownText;
+    public Text Level;
 }
 
 public class UIRoot : MonoBehaviour
@@ -21,6 +22,7 @@ public class UIRoot : MonoBehaviour
     public Canvas Canvas;
     public List<PerkDef> CurrentPerks = new List<PerkDef>();
     public List<SkillDef> CurrentSkills = new List<SkillDef>();
+    public List<ShopOffer> CurrentShopOffers = new List<ShopOffer>();
 
     private Art art;
     private CanvasGroup menuGroup;
@@ -41,6 +43,7 @@ public class UIRoot : MonoBehaviour
     private RectTransform equipItemsRoot;
 
     private Text menuBest;
+    private Text menuEndlessBest;
     private Text menuClassTitle;
     private Text menuClassStats;
     private Text menuClassDesc;
@@ -76,12 +79,16 @@ public class UIRoot : MonoBehaviour
     private Text hpText;
     private Text shieldText;
     private Text statsText;
+    private Text coinText;
+    private Image coinPanel;
     private Text dashText;
     private Text bossName;
     private Text bannerTitle;
     private Text bannerSub;
     private Text perkTitle;
     private Text perkHint;
+    private Text shopCoinsText;
+    private Button shopContinueButton;
     private Text endTitle;
     private Text endStats;
     private Text pauseTitle;
@@ -128,6 +135,7 @@ public class UIRoot : MonoBehaviour
     private bool perkMode;
     private bool skillMode;
     private bool restMode;
+    private bool shopMode;
     private float readyPulse;
 
     public void Init()
@@ -346,7 +354,7 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.3.2", 20, new Color(0.84f, 0.74f, 0.58f),
+        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.4.0", 20, new Color(0.84f, 0.74f, 0.58f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
 
@@ -425,6 +433,12 @@ public class UIRoot : MonoBehaviour
 
         MakeButton(menuRoot, "СПУСТИТЬСЯ", new Vector2(0f, -232f), new Vector2(430f, 64f),
             () => Game.I.StartRun(), 29);
+
+        MakeButton(menuRoot, "БЕСКОНЕЧНЫЙ РАЗЛОМ", new Vector2(415f, -196f), new Vector2(380f, 54f),
+            () => Game.I.StartEndlessRun(), 20, false);
+        menuEndlessBest = TextAt(menuRoot, "", 13, new Color(0.78f, 0.62f, 0.95f), TextAnchor.MiddleCenter,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(415f, -232f), new Vector2(380f, 22f), art.Sans, true);
 
         MakeButton(menuRoot, "СНАРЯЖЕНИЕ", new Vector2(-255f, -314f), new Vector2(160f, 46f),
             ShowEquipment, 16, false);
@@ -623,6 +637,14 @@ public class UIRoot : MonoBehaviour
                 ? "ЛУЧШИЙ: КОМНАТА " + best + "  ·  УБИТО " + kills + "  ·  ПОБЕД " + clears
                 : "ЭТО ПОДЗЕМЕЛЬЕ ЕЩЁ НЕ ПРОЙДЕНО";
         }
+        if (menuEndlessBest != null)
+        {
+            int best = MetaProgress.BestEndlessRoom;
+            int kills = MetaProgress.BestEndlessKills;
+            menuEndlessBest.text = best > 0
+                ? "РЕКОРД РАЗЛОМА: ГЛУБИНА " + best + "  ·  УБИТО " + kills
+                : "РЕКОРД РАЗЛОМА: ПОКА НЕТ";
+        }
     }
 
     private void BuildHelp()
@@ -688,6 +710,7 @@ public class UIRoot : MonoBehaviour
         if (helpPanel != null) helpPanel.gameObject.SetActive(false);
         SetGroup(equipGroup, false);
         SetGroup(settingsGroup, false);
+        SetShopChrome(false);
         ResetLowHp();
         SetGroup(menuGroup, true);
         SetGroup(hudGroup, false);
@@ -783,6 +806,19 @@ public class UIRoot : MonoBehaviour
             new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -28f),
             new Vector2(220f, 52f), art.Sans, true);
 
+        coinPanel = Img(root, art.UI("ui_panel_dark", new Vector4(16f, 16f, 16f, 16f)),
+            new Color(1f, 1f, 1f, 0.78f), new Vector2(1f, 1f), new Vector2(1f, 1f),
+            new Vector2(1f, 1f), new Vector2(-22f, -92f), new Vector2(248f, 44f), true);
+        coinPanel.raycastTarget = false;
+        var coinIcon = Img(coinPanel.rectTransform, art.UI("coin"), Color.white,
+            new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(16f, 0f), new Vector2(30f, 30f), false);
+        coinIcon.preserveAspect = true;
+        coinText = TextAt(coinPanel.rectTransform, "МОНЕТЫ 0", 18, new Color(1f, 0.85f, 0.4f),
+            TextAnchor.MiddleRight, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
+            new Vector2(-14f, 0f), new Vector2(190f, 32f), art.Sans, true);
+        coinPanel.gameObject.SetActive(false);
+
         BuildBossBar(root);
         BuildSkillBar(root);
         BuildDash(root);
@@ -873,6 +909,10 @@ public class UIRoot : MonoBehaviour
                 art.Serif, true);
             sv.CooldownText.rectTransform.offsetMin = Vector2.zero;
             sv.CooldownText.rectTransform.offsetMax = Vector2.zero;
+            sv.Level = TextAt(slotRt, "", 12, Pal.Purple, TextAnchor.UpperRight,
+                new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-5f, -3f),
+                new Vector2(40f, 18f), art.Sans, true);
+            sv.Level.gameObject.SetActive(false);
             slots[i] = sv;
         }
     }
@@ -909,13 +949,25 @@ public class UIRoot : MonoBehaviour
         var room = Game.I.Rooms.CurrentRoom;
         if (roomText != null)
         {
-            roomText.text = room == null ? "" : "КОМНАТА " + (run.RoomIndex + 1) + " / " + run.RoomCount;
+            roomText.text = room == null ? "" : run.Endless
+                ? "ГЛУБИНА " + (run.RoomIndex + 1)
+                : "КОМНАТА " + (run.RoomIndex + 1) + " / " + run.RoomCount;
             roomText.color = room == null ? Pal.Gold : Data.RoomAccent(room.Type);
         }
         if (roomSub != null)
         {
-            roomSub.text = room == null ? "" : room.Name + "  ·  " + run.Dungeon.Name;
+            roomSub.text = room == null ? "" : room.Name + "  ·  " +
+                (run.Endless ? "БЕСКОНЕЧНЫЙ РАЗЛОМ" : run.Dungeon.Name);
         }
+        RefreshCoins();
+    }
+
+    public void RefreshCoins()
+    {
+        if (coinPanel == null) return;
+        bool show = Game.I != null && Game.I.Run != null && Game.I.Run.Endless;
+        coinPanel.gameObject.SetActive(show);
+        if (show && coinText != null) coinText.text = "МОНЕТЫ " + Game.I.Run.Coins;
     }
 
     public void RefreshSkills()
@@ -953,6 +1005,16 @@ public class UIRoot : MonoBehaviour
             {
                 sv.Cooldown.enabled = false;
                 sv.CooldownText.text = "";
+            }
+            if (sv.Level != null)
+            {
+                bool showLevel = Game.I.Run != null && Game.I.Run.Endless && slot.Def != null;
+                sv.Level.gameObject.SetActive(showLevel);
+                if (showLevel)
+                {
+                    sv.Level.text = slot.Mastery ? "МАСТ." : "УР." + slot.Level;
+                    sv.Level.color = slot.Mastery ? Pal.Purple : new Color(0.88f, 0.78f, 0.58f);
+                }
             }
         }
     }
@@ -995,6 +1057,20 @@ public class UIRoot : MonoBehaviour
             new Vector2(0.5f, 0.5f), new Vector2(0f, -26f), new Vector2(1200f, 520f));
         restRoot = MakeRect("RestCards", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(1000f, 500f));
+
+        shopCoinsText = TextAt(root, "", 21, new Color(1f, 0.85f, 0.4f), TextAnchor.MiddleRight,
+            new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-52f, -120f),
+            new Vector2(360f, 30f), art.Sans, true);
+        shopCoinsText.gameObject.SetActive(false);
+
+        shopContinueButton = MakeButton(root, "ДАЛЬШЕ", new Vector2(0f, 52f), new Vector2(300f, 56f),
+            () => Game.I.ContinueShop(), 24, false);
+        var shopRt = shopContinueButton.GetComponent<RectTransform>();
+        shopRt.anchorMin = new Vector2(0.5f, 0f);
+        shopRt.anchorMax = new Vector2(0.5f, 0f);
+        shopRt.pivot = new Vector2(0.5f, 0f);
+        shopRt.anchoredPosition = new Vector2(0f, 26f);
+        shopContinueButton.gameObject.SetActive(false);
     }
 
     public void ShowPerks(List<PerkDef> perks, string title)
@@ -1003,6 +1079,7 @@ public class UIRoot : MonoBehaviour
         perkMode = true;
         skillMode = false;
         restMode = false;
+        SetShopChrome(false);
         CurrentPerks = perks ?? new List<PerkDef>();
         CurrentSkills.Clear();
         perkTitle.text = title;
@@ -1029,6 +1106,7 @@ public class UIRoot : MonoBehaviour
         perkMode = false;
         skillMode = true;
         restMode = false;
+        SetShopChrome(false);
         CurrentSkills = skills ?? new List<SkillDef>();
         CurrentPerks.Clear();
         perkTitle.text = title;
@@ -1062,6 +1140,7 @@ public class UIRoot : MonoBehaviour
         perkMode = false;
         skillMode = false;
         restMode = true;
+        SetShopChrome(false);
         perkTitle.text = "ПРИВАЛ";
         perkTitle.color = Pal.Green;
         ClearChildren(perkCardsRoot);
@@ -1078,6 +1157,62 @@ public class UIRoot : MonoBehaviour
             Pal.Gold, "2", "УСИЛЕНИЕ", () => Game.I.ChooseRest(false));
     }
 
+
+    public void ShowShop(List<ShopOffer> offers, int coins, int depth)
+    {
+        SetGroup(perkGroup, true);
+        perkMode = false;
+        skillMode = false;
+        restMode = false;
+        SetShopChrome(true);
+        CurrentShopOffers = offers ?? new List<ShopOffer>();
+        CurrentPerks.Clear();
+        CurrentSkills.Clear();
+        perkTitle.text = "ЛАВКА РАЗЛОМА";
+        perkTitle.color = Pal.Purple;
+        perkHint.text = "МОНЕТЫ: " + coins + "  ·  1, 2, 3 — купить  ·  ДАЛЬШЕ — идти глубже";
+        if (shopCoinsText != null) shopCoinsText.text = "МОНЕТЫ: " + coins;
+        ClearChildren(perkCardsRoot);
+        ClearChildren(restRoot);
+        perkCardsRoot.gameObject.SetActive(true);
+        restRoot.gameObject.SetActive(false);
+        for (int i = 0; i < CurrentShopOffers.Count; i++)
+        {
+            int idx = i;
+            var offer = CurrentShopOffers[i];
+            if (offer == null) continue;
+            float x = (i - (CurrentShopOffers.Count - 1) * 0.5f) * 350f;
+            string costColor = offer.Cost <= coins ? "#E8C16D" : "#D96B63";
+            string desc = "<color=" + costColor + ">ЦЕНА: " + offer.Cost + " МОНЕТ</color>\n" + offer.Desc;
+            BuildCard(perkCardsRoot, new Vector2(x, 0f), offer.Icon, offer.Title, desc,
+                offer.Accent, (i + 1).ToString(), offer.Badge, () => ChooseShopCard(idx));
+        }
+        if (shopContinueButton != null) shopContinueButton.gameObject.SetActive(true);
+    }
+
+    private void SetShopChrome(bool visible)
+    {
+        shopMode = visible;
+        if (shopCoinsText != null) shopCoinsText.gameObject.SetActive(false);
+        if (shopContinueButton != null) shopContinueButton.gameObject.SetActive(visible);
+    }
+
+    private void ChooseShopCard(int index)
+    {
+        Game.I.ChooseShop(index);
+    }
+
+    public void HideShop()
+    {
+        shopMode = false;
+        SetShopChrome(false);
+        SetGroup(perkGroup, false);
+        ClearChildren(perkCardsRoot);
+        ClearChildren(restRoot);
+    }
+
+    public bool ShopOpen => shopMode;
+    public bool BannerVisible => bannerGroup != null && bannerGroup.gameObject.activeSelf && bannerGroup.alpha > 0.01f;
 
     private void SetChoiceHint(int count, string noun)
     {
@@ -1126,13 +1261,13 @@ public class UIRoot : MonoBehaviour
             new Vector2(200f, 22f), art.Sans, true);
         badgeText.fontStyle = FontStyle.Bold;
 
-        var titleText = TextAt(cardRt, title, 21, Pal.Cream, TextAnchor.MiddleCenter,
+        var titleText = TextAt(cardRt, title, 19, Pal.Cream, TextAnchor.MiddleCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -154f),
             new Vector2(276f, 66f), art.Serif, true);
         titleText.fontStyle = FontStyle.Bold;
         titleText.resizeTextForBestFit = true;
-        titleText.resizeTextMinSize = 14;
-        titleText.resizeTextMaxSize = 21;
+        titleText.resizeTextMinSize = 13;
+        titleText.resizeTextMaxSize = 19;
 
         var descText = TextAt(cardRt, desc, 18, new Color(0.86f, 0.8f, 0.7f), TextAnchor.UpperCenter,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -230f),
@@ -1175,6 +1310,7 @@ public class UIRoot : MonoBehaviour
     {
         SetGroup(perkGroup, false);
         perkMode = false;
+        SetShopChrome(false);
         ClearChildren(perkCardsRoot);
         ClearChildren(restRoot);
     }
@@ -1183,6 +1319,7 @@ public class UIRoot : MonoBehaviour
     {
         SetGroup(perkGroup, false);
         skillMode = false;
+        SetShopChrome(false);
         ClearChildren(perkCardsRoot);
         ClearChildren(restRoot);
     }
@@ -1191,6 +1328,7 @@ public class UIRoot : MonoBehaviour
     {
         SetGroup(perkGroup, false);
         restMode = false;
+        SetShopChrome(false);
         ClearChildren(perkCardsRoot);
         ClearChildren(restRoot);
     }
@@ -1392,29 +1530,52 @@ public class UIRoot : MonoBehaviour
         ResetLowHp();
         SetGroup(hudGroup, false);
         SetGroup(endGroup, true);
-        endTitle.text = victory ? "ПОБЕДА!" : "ПОРАЖЕНИЕ";
-        endTitle.color = victory ? Pal.Gold : new Color(0.85f, 0.3f, 0.28f);
         var run = Game.I.Run;
+        bool endless = run != null && run.Endless;
+        bool endlessCleared = endless && victory;
+        int depth = endless ? Mathf.Min(run.RoomIndex + 1, run.RoomCount) : run.RoomIndex + 1;
+        endTitle.text = endlessCleared
+            ? "РАЗЛОМ ЗАКРЫТ"
+            : endless ? "ГЛУБИНА " + depth
+            : victory ? "ПОБЕДА!" : "ПОРАЖЕНИЕ";
+        endTitle.color = endless ? Pal.Purple : victory ? Pal.Gold : new Color(0.85f, 0.3f, 0.28f);
         string time = FormatTime(run.RunTime);
         var dungeon = run.Dungeon;
-        var next = victory ? MetaProgress.NextDungeon(dungeon) : null;
+        var next = !endless && victory ? MetaProgress.NextDungeon(dungeon) : null;
         bool hasNext = next != null;
-        endStats.text =
-            (victory
-                ? "БОСС ПОВЕРЖЕН. " + (dungeon != null ? dungeon.Name : "ПОДЗЕМЕЛЬЕ") + " затихло."
-                : "ГЕРОЙ ПАЛ. Но лист можно перевернуть.") +
-            "\n<color=#E8C16D>Комнат пройдено:</color> " + (run.RoomIndex + (victory ? 1 : 0)) +
-            " / " + run.RoomCount +
-            "\n<color=#E8C16D>Убито врагов:</color> " + run.Kills +
-            "\n<color=#E8C16D>Нанесено урона:</color> " + Mathf.RoundToInt(run.DamageDealt) +
-            "\n<color=#E8C16D>Время:</color> " + time +
-            "\n<color=#E8C16D>Лучший забег:</color> комната " + Mathf.Max(1, run.BestRoom) +
-            " · убито " + run.BestKills +
-            (victory
-                ? hasNext
-                    ? "\n<color=#8FD3C7>ОТКРЫТО:</color> " + next.Name + "  ·  N — идти дальше"
-                    : "\n<color=#8FD3C7>ВСЕ ПОДЗЕМЕЛЬЯ ПРОЙДЕНЫ</color>"
-                : "");
+        if (endless)
+        {
+            endStats.text =
+                (endlessCleared
+                    ? "РАЗЛОМ ЗАКРЫТ. Ты прошёл все " + run.RoomCount + " комнат бесконечности."
+                    : "БЕСКОНЕЧНЫЙ РАЗЛОМ. Герой пал на глубине " + depth + ".") +
+                "\n<color=#E8C16D>Глубина:</color> " + depth +
+                "\n<color=#E8C16D>Убито врагов:</color> " + run.Kills +
+                "\n<color=#E8C16D>Монет собрано:</color> " + run.Coins +
+                "\n<color=#E8C16D>Нанесено урона:</color> " + Mathf.RoundToInt(run.DamageDealt) +
+                "\n<color=#E8C16D>Время:</color> " + time +
+                "\n<color=#C9A7F0>Лучшая глубина:</color> " + Mathf.Max(1, run.BestRoom) +
+                " · убито " + run.BestKills;
+        }
+        else
+        {
+            endStats.text =
+                (victory
+                    ? "БОСС ПОВЕРЖЕН. " + (dungeon != null ? dungeon.Name : "ПОДЗЕМЕЛЬЕ") + " затихло."
+                    : "ГЕРОЙ ПАЛ. Но лист можно перевернуть.") +
+                "\n<color=#E8C16D>Комнат пройдено:</color> " + (run.RoomIndex + (victory ? 1 : 0)) +
+                " / " + run.RoomCount +
+                "\n<color=#E8C16D>Убито врагов:</color> " + run.Kills +
+                "\n<color=#E8C16D>Нанесено урона:</color> " + Mathf.RoundToInt(run.DamageDealt) +
+                "\n<color=#E8C16D>Время:</color> " + time +
+                "\n<color=#E8C16D>Лучший забег:</color> комната " + Mathf.Max(1, run.BestRoom) +
+                " · убито " + run.BestKills +
+                (victory
+                    ? hasNext
+                        ? "\n<color=#8FD3C7>ОТКРЫТО:</color> " + next.Name + "  ·  N — идти дальше"
+                        : "\n<color=#8FD3C7>ВСЕ ПОДЗЕМЕЛЬЯ ПРОЙДЕНЫ</color>"
+                    : "");
+        }
 
         if (nextDungeonButton != null) nextDungeonButton.gameObject.SetActive(hasNext);
         if (endRestartButton != null)
@@ -1448,6 +1609,28 @@ public class UIRoot : MonoBehaviour
         endLootFrame.color = new Color(0.55f, 0.45f, 0.34f, 0.9f);
         endLootMeta.color = new Color(0.78f, 0.72f, 0.63f);
         endLootStats.color = Pal.Cream;
+
+        if (Game.I.Run != null && Game.I.Run.Endless)
+        {
+            var run = Game.I.Run;
+            int depth = Mathf.Min(run.RoomIndex + 1, run.RoomCount);
+            endLootBadge.text = victory ? "РАЗЛОМ ПРОЙДЕН" : "БЕСКОНЕЧНЫЙ РАЗЛОМ";
+            endLootBadge.color = Pal.Purple;
+            endLootName.text = "ГЛУБИНА " + depth;
+            endLootName.color = new Color(0.86f, 0.72f, 1f);
+            endLootMeta.text = "МОНЕТ СОБРАНО: " + run.Coins;
+            endLootStats.text = victory
+                ? "Все " + run.RoomCount + " комнат разлома пройдены.\nУбито за забег: " + run.Kills +
+                  "\n\nРазлом закрыт. Но картон помнит всё."
+                : "Лучшая глубина: " + Mathf.Max(1, run.BestRoom) +
+                  "\nУбито за забег: " + run.Kills +
+                  "\n\nРазлом ждёт нового героя.";
+            endLootIcon.sprite = art.UI("coin");
+            endLootIcon.color = Color.white;
+            endLootGlow.color = new Color(0.65f, 0.4f, 0.95f, 0.24f);
+            endLootFrame.color = new Color(0.65f, 0.45f, 0.9f, 0.85f);
+            return;
+        }
 
         if (loot != null && loot.Item != null)
         {
@@ -1866,6 +2049,20 @@ public class UIRoot : MonoBehaviour
             new Vector2(0f, 70f), new Vector2(1000f, 30f), art.Sans, true);
     }
 
+    public void HideBanner()
+    {
+        if (bannerRoutine != null)
+        {
+            StopCoroutine(bannerRoutine);
+            bannerRoutine = null;
+        }
+        if (bannerGroup != null)
+        {
+            bannerGroup.alpha = 0f;
+            bannerGroup.gameObject.SetActive(false);
+        }
+    }
+
     public void ShowBanner(string title, string subtitle, float duration, Color accent)
     {
         if (bannerGroup == null) return;
@@ -2105,6 +2302,21 @@ public class UIRoot : MonoBehaviour
                 Game.I.ChooseRest(false);
             }
         }
+        else if (shopMode && Game.I.State == GameState.Perk)
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha1 + i) || Input.GetKeyDown(KeyCode.Keypad1 + i))
+                {
+                    ChooseShopCard(i);
+                }
+            }
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) ||
+                Input.GetKeyDown(KeyCode.Space))
+            {
+                Game.I.ContinueShop();
+            }
+        }
     }
 
     private void ResetLowHp()
@@ -2153,6 +2365,7 @@ public class UIRoot : MonoBehaviour
         {
             statsText.text = "УБИТО  " + run.Kills + "\nВРЕМЯ  " + FormatTime(run.RunTime);
         }
+        RefreshCoins();
 
         if (dashCooldown != null && dashIcon != null && p != null)
         {

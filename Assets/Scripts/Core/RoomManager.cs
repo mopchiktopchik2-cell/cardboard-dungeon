@@ -68,8 +68,8 @@ public class RoomManager : MonoBehaviour
         ClearRoom();
         CurrentDungeon = Game.I.Run.Dungeon ?? MetaProgress.SelectedDungeon;
         if (CurrentDungeon == null) CurrentDungeon = Data.Dungeons[0];
-        index = Mathf.Clamp(index, 0, CurrentDungeon.Rooms.Length - 1);
-        CurrentRoom = CurrentDungeon.Rooms[index];
+        CurrentRoom = Game.I.Run.RoomAt(index);
+        if (CurrentRoom == null) CurrentRoom = Data.Dungeons[0].Rooms[0];
         CurrentTheme = Data.Theme(CurrentRoom.Theme);
         BossDead = false;
         Cleared = false;
@@ -458,8 +458,7 @@ public class RoomManager : MonoBehaviour
             if (WaveIndex == 0)
             {
                 WaveIndex = 1;
-                var dungeon = CurrentDungeon ?? Game.I.Run.Dungeon;
-                var bossKind = dungeon != null ? dungeon.BossKind : EnemyKind.Lich;
+                var bossKind = Game.I.Run.BossKind;
                 SpawnOne(bossKind, false, new Vector2(3.2f, 0f));
             }
             return;
@@ -518,7 +517,7 @@ public class RoomManager : MonoBehaviour
         EnemyKind[] adds = dungeon != null && dungeon.Adds != null && dungeon.Adds.Length > 0
             ? dungeon.Adds
             : new[] { EnemyKind.Imp, EnemyKind.Skeleton };
-        if (dungeon != null && dungeon.BossKind == EnemyKind.SpiderQueen)
+        if (dungeon != null && Game.I.Run.BossKind == EnemyKind.SpiderQueen)
         {
             adds = new[] { EnemyKind.Spider };
         }
@@ -539,8 +538,9 @@ public class RoomManager : MonoBehaviour
         int difficulty = dungeon != null ? (int)dungeon.Difficulty : 0;
         int count = 2 + wave + difficulty;
         if (room > 7) count++;
+        if (Game.I.Run.Endless) count += Mathf.Min(2, room / 15);
         if (CurrentRoom != null && CurrentRoom.Type == RoomType.Elite) count++;
-        count = Mathf.Clamp(count, 2, 8);
+        count = Mathf.Clamp(count, 2, 9);
         var rng = new System.Random((room + 1) * 977 + wave * 131 + (dungeon != null ? dungeon.Id.GetHashCode() : 0));
         for (int i = 0; i < count; i++)
         {
@@ -716,6 +716,12 @@ public class RoomManager : MonoBehaviour
                      CurrentRoom.Type == RoomType.Boss;
         victoryRoutine = null;
         if (!valid) yield break;
+        if (Game.I.Run.Endless)
+        {
+            Game.I.Player.VictoryLocked = false;
+            Game.I.OnRoomCleared();
+            yield break;
+        }
         Game.I.Victory();
     }
 
@@ -995,6 +1001,7 @@ public class RoomManager : MonoBehaviour
         foreach (var h in FindObjectsOfType<Hazard>()) Destroy(h.gameObject);
         foreach (var f in FindObjectsOfType<FxSprite>()) Destroy(f.gameObject);
         foreach (var f in FindObjectsOfType<TelegraphFx>()) Destroy(f.gameObject);
+        foreach (var c in FindObjectsOfType<CoinPickup>()) Destroy(c.gameObject);
         foreach (var e in Enemies)
         {
             if (e != null) Destroy(e.gameObject);

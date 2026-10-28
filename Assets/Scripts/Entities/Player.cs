@@ -46,6 +46,8 @@ public class Player : MonoBehaviour
     public float PoisonTimer;
     public float PoisonDps;
     public float RageTimer;
+    public bool RageMastery;
+    public bool ShieldRetaliate;
     public float StunTimer;
     public float CastLock;
     public float SlowTimer;
@@ -65,7 +67,7 @@ public class Player : MonoBehaviour
 
     public Enemy CurrentTarget => currentTarget;
     public Vector2 Facing => facing;
-    public float RageMult => RageTimer > 0f ? 1.5f : 1f;
+    public float RageMult => RageTimer > 0f ? (RageMastery ? 1.75f : 1.5f) : 1f;
 
     public static Player Create(Transform parent)
     {
@@ -109,6 +111,8 @@ public class Player : MonoBehaviour
         Control = true;
         PoisonTimer = 0f;
         RageTimer = 0f;
+        RageMastery = false;
+        ShieldRetaliate = false;
         StunTimer = 0f;
         CastLock = 0f;
         SlowTimer = 0f;
@@ -182,6 +186,8 @@ public class Player : MonoBehaviour
         }
         PoisonTimer = 0f;
         RageTimer = 0f;
+        RageMastery = false;
+        ShieldRetaliate = false;
         StunTimer = 0f;
         CastLock = 0f;
         SlowTimer = 0f;
@@ -450,10 +456,19 @@ public class Player : MonoBehaviour
             amount -= absorbed;
             Game.I.Fx.FloatingText(transform.position + Vector3.up * 1.4f, "-" + Mathf.RoundToInt(absorbed),
                 new Color(0.6f, 0.85f, 1f), 0.8f);
+            if (ShieldRetaliate && attacker != null && !attacker.Dead)
+            {
+                attacker.TakeDamage(Stats.maxHp * 0.18f, transform.position, false, false);
+                Game.I.Fx.Line(transform.position + Vector3.up * 0.7f,
+                    attacker.transform.position + Vector3.up * 0.6f, new Color(0.7f, 0.9f, 1f), 0.09f, 0.16f);
+                Game.I.Fx.FloatingText(attacker.transform.position + Vector3.up * 1.2f, "ОЖОГ",
+                    new Color(0.7f, 0.9f, 1f), 0.75f);
+            }
             if (Shield <= 0f)
             {
                 Shield = 0f;
                 ShieldTimer = 0f;
+                ShieldRetaliate = false;
             }
         }
 
@@ -540,13 +555,15 @@ public class Player : MonoBehaviour
         Game.I.Audio.Play("sfx_dash", 0.7f, 1.15f);
     }
 
-    public void AddShield(float amount, float duration = 6f)
+    public void AddShield(float amount, float duration = 6f, bool retaliate = false)
     {
         if (amount <= 0f) return;
         Shield += amount;
         ShieldTimer = Mathf.Max(ShieldTimer, duration);
+        ShieldRetaliate = retaliate;
         Game.I.Fx.Shield(transform, duration);
-        Game.I.Fx.Ring(transform.position + Vector3.up * 0.6f, new Color(0.55f, 0.8f, 1f), 0.7f, 0.4f);
+        Game.I.Fx.Ring(transform.position + Vector3.up * 0.6f,
+            retaliate ? new Color(1f, 0.65f, 0.35f) : new Color(0.55f, 0.8f, 1f), 0.7f, 0.4f);
         Game.I.Audio.Play("sfx_shield", 0.5f);
     }
 
@@ -557,10 +574,12 @@ public class Player : MonoBehaviour
         poisonTick = Mathf.Min(poisonTick, 0.2f);
     }
 
-    public void Rage(float duration)
+    public void Rage(float duration, bool mastery = false)
     {
         RageTimer = Mathf.Max(RageTimer, duration);
-        Game.I.Fx.Ring(transform.position, new Color(1f, 0.45f, 0.35f), 1.1f, 0.5f);
+        RageMastery = mastery;
+        Game.I.Fx.Ring(transform.position,
+            mastery ? new Color(1f, 0.28f, 0.18f) : new Color(1f, 0.45f, 0.35f), mastery ? 1.7f : 1.1f, 0.5f);
         Game.I.Audio.Play("sfx_cast", 0.7f);
     }
 
@@ -571,7 +590,9 @@ public class Player : MonoBehaviour
 
     public void KillHeal(float dealtDamage)
     {
-        float lifesteal = Mathf.Min(Stats.lifesteal, Data.LifestealCap);
+        float lifesteal = Stats.lifesteal;
+        if (RageMastery && RageTimer > 0f) lifesteal += 0.15f;
+        lifesteal = Mathf.Min(lifesteal, Data.LifestealCap + 0.15f);
         if (lifesteal <= 0f || dealtDamage <= 0f) return;
         Heal(dealtDamage * lifesteal);
     }

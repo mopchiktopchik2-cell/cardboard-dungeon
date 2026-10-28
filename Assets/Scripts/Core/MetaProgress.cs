@@ -290,6 +290,20 @@ public static class MetaProgress
         PlayerPrefs.Save();
     }
 
+    public static int BestEndlessRoom => PlayerPrefs.GetInt("endless_best_room", 0);
+    public static int BestEndlessKills => PlayerPrefs.GetInt("endless_best_kills", 0);
+    public static int BestEndlessCoins => PlayerPrefs.GetInt("endless_best_coins", 0);
+    public static int EndlessRuns => PlayerPrefs.GetInt("endless_runs", 0);
+
+    public static void RecordEndless(int reached, int kills, int coins)
+    {
+        if (reached > BestEndlessRoom) PlayerPrefs.SetInt("endless_best_room", reached);
+        if (kills > BestEndlessKills) PlayerPrefs.SetInt("endless_best_kills", kills);
+        if (coins > BestEndlessCoins) PlayerPrefs.SetInt("endless_best_coins", coins);
+        PlayerPrefs.SetInt("endless_runs", EndlessRuns + 1);
+        PlayerPrefs.Save();
+    }
+
     /// <summary>Сбрасывает только прогресс: класс, подземелье, лут и рекорды.</summary>
     public static void ResetProgress()
     {
@@ -301,6 +315,10 @@ public static class MetaProgress
         PlayerPrefs.DeleteKey(CharmKey);
         PlayerPrefs.DeleteKey("best_room");
         PlayerPrefs.DeleteKey("best_kills");
+        PlayerPrefs.DeleteKey("endless_best_room");
+        PlayerPrefs.DeleteKey("endless_best_kills");
+        PlayerPrefs.DeleteKey("endless_best_coins");
+        PlayerPrefs.DeleteKey("endless_runs");
         foreach (var dungeon in Data.Dungeons)
         {
             PlayerPrefs.DeleteKey("best_room_" + dungeon.Id);

@@ -94,6 +94,7 @@ public class Game : MonoBehaviour
         if (QA && HasArg("-qaEquip")) StartCoroutine(QaEquipShot());
         else if (QA && HasArg("-qaSettingsShot")) StartCoroutine(QaSettingsShot());
         else if (QA && HasArg("-qaBossAttacks")) StartCoroutine(QaBossAttacks());
+        else if (QA && HasArg("-qaEndless")) StartCoroutine(QaEndless());
         else if (QA && HasArg("-qaAudit")) StartCoroutine(QaAudit());
         else if (QA && HasArg("-qaTour")) StartCoroutine(QaTour());
     }
@@ -339,6 +340,147 @@ public class Game : MonoBehaviour
         Application.Quit();
     }
 
+    private IEnumerator QaEndless()
+    {
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+        MetaProgress.SelectedClass = HeroClass.Mage;
+        Player.QaInvincible = true;
+        yield return new WaitForSecondsRealtime(0.6f);
+        yield return QaShot(shotsDir, "endless_menu");
+
+        StartEndlessRun();
+        yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == 0, 6f);
+        EndlessCheck("endless run starts", Run.Endless && Run.Dungeon != null &&
+                                            Run.Dungeon.Id == EndlessContent.DungeonId);
+        EndlessCheck("endless starts with 25 coins", Run.Coins == EndlessContent.StartCoins);
+        yield return QaShot(shotsDir, "endless_room_01");
+
+        for (int expected = 0; expected < 5; expected++)
+        {
+            yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == expected, 12f);
+            EndlessCheck("endless room " + (expected + 1) + " reached",
+                State == GameState.Combat && Run.RoomIndex == expected);
+            if (State != GameState.Combat || Run.RoomIndex != expected) break;
+
+            if (expected == 4)
+            {
+                EndlessCheck("endless boss room", Run.IsBossRoom(Run.RoomIndex));
+                EndlessCheck("endless boss kind", Run.BossKind == EndlessContent.BossFor(Run.RoomIndex));
+                yield return QaWaitFor(() => Rooms.Enemies.Exists(e => e != null && e.Boss), 3f);
+                EndlessCheck("endless boss spawned", Rooms.Enemies.Exists(e => e != null && e.Boss));
+                EndlessCheck("endless scaling grows", Run.EnemyHpScale > EndlessContent.EnemyHpScale(0));
+                yield return QaShot(shotsDir, "endless_boss");
+                break;
+            }
+
+            yield return QaCastStarters();
+            float killTimer = 20f;
+            while (State == GameState.Combat && killTimer > 0f)
+            {
+                Rooms.KillAllEnemies();
+                Player.Heal(9999f);
+                killTimer -= 0.25f;
+                yield return new WaitForSecondsRealtime(0.25f);
+            }
+            yield return QaWaitFor(() => State == GameState.Perk, 8f);
+            EndlessCheck("endless shop opens", State == GameState.Perk && UI.ShopOpen);
+            if (State != GameState.Perk || !UI.ShopOpen) break;
+
+            EndlessCheck("endless shop offers three", UI.CurrentShopOffers.Count == EndlessContent.ShopOfferCount);
+            if (expected == 0)
+            {
+                EndlessCheck("endless kills drop coins", Run.Coins > EndlessContent.StartCoins);
+            }
+            yield return new WaitForSecondsRealtime(0.25f);
+            yield return QaShot(shotsDir, "endless_shop_" + (expected + 1).ToString("00"));
+
+            if (UI.CurrentShopOffers.Count > 0)
+            {
+                var offer = UI.CurrentShopOffers[0];
+                int beforeBuy = Run.Coins;
+                Run.AddCoins(10000);
+                int expectedCoins = Run.Coins - offer.Cost;
+                ChooseShop(0);
+                yield return null;
+                EndlessCheck("endless shop purchase works",
+                    Run.Coins == expectedCoins && UI.ShopOpen);
+            }
+
+            // Проверяем, что баннер mastery не скрывается обновлением лавки.
+            foreach (var slot in Skills.Slots)
+            {
+                if (slot.Def != null) Run.SetSkillLevel(slot.Def.Id, EndlessContent.MaxSkillLevel - 1);
+            }
+            Run.AddCoins(10000);
+            UI.ShowShop(Run.BuildShopOffers(EndlessContent.ShopOfferCount), Run.Coins, Run.RoomIndex);
+            int masteryOffer = -1;
+            for (int i = 0; i < UI.CurrentShopOffers.Count; i++)
+            {
+                var candidate = UI.CurrentShopOffers[i];
+                if (candidate != null && candidate.Kind == ShopOfferKind.Upgrade &&
+                    candidate.TargetLevel == EndlessContent.MaxSkillLevel)
+                {
+                    masteryOffer = i;
+                    break;
+                }
+            }
+            EndlessCheck("endless mastery offer available", masteryOffer >= 0);
+            if (masteryOffer >= 0)
+            {
+                ChooseShop(masteryOffer);
+                yield return new WaitForSecondsRealtime(0.35f);
+                EndlessCheck("endless mastery banner visible", UI.BannerVisible);
+                yield return QaShot(shotsDir, "endless_mastery");
+            }
+
+            Run.SetSkillLevel("fireball", EndlessContent.MaxSkillLevel);
+            bool mastery = false;
+            foreach (var slot in Skills.Slots)
+            {
+                if (slot.Def != null && slot.Def.Id == "fireball" && slot.Mastery) mastery = true;
+            }
+            EndlessCheck("endless skill reaches mastery", mastery &&
+                Run.SkillLevel("fireball") == EndlessContent.MaxSkillLevel);
+            var offers = Run.BuildShopOffers(EndlessContent.ShopOfferCount);
+            EndlessCheck("endless maxed skill is not sold",
+                !offers.Exists(o => o != null && o.Kind == ShopOfferKind.Upgrade &&
+                                    o.Skill != null && o.Skill.Id == "fireball"));
+
+            ContinueShop();
+            yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == expected + 1, 12f);
+        }
+
+        if (State == GameState.Combat && Run.RoomIndex == 4 && Skills.Slots[0].Def != null &&
+            Skills.Slots[0].Def.Id == "fireball")
+        {
+            Skills.Slots[0].Cd = 0f;
+            int before = FindObjectsOfType<Projectile>().Length;
+            Skills.TryCast(0);
+            yield return new WaitForSecondsRealtime(0.12f);
+            int after = FindObjectsOfType<Projectile>().Length;
+            EndlessCheck("fireball mastery fires a volley", after - before >= 3);
+        }
+
+        Debug.Log("[QaEndless] passed=" + auditPassed + " failed=" + auditFailed);
+        yield return new WaitForSecondsRealtime(0.3f);
+        Application.Quit();
+    }
+
+    private void EndlessCheck(string name, bool ok)
+    {
+        if (ok)
+        {
+            auditPassed++;
+            Debug.Log("[QaEndless] PASS " + name);
+        }
+        else
+        {
+            auditFailed++;
+            Debug.LogError("[QaEndless] FAIL " + name);
+        }
+    }
+
     private IEnumerator QaAudit()
     {
         Player.QaInvincible = false;
@@ -509,7 +651,7 @@ public class Game : MonoBehaviour
     private IEnumerator QaEnterBoss()
     {
         StopFlow();
-        int index = Run.RoomCount - 1;
+        int index = Run.Endless ? 4 : Run.RoomCount - 1;
         Run.RoomIndex = index;
         Rooms.BuildRoom(index, false);
         Player.RevivePosition(Rooms.PlayerSpawn);
@@ -631,14 +773,28 @@ public class Game : MonoBehaviour
         UI.HideEnd();
         UI.HidePause();
         UI.ShowHud();
-        Run.StartRun();
+        Run.StartRun(false);
+        Audio.Music("music_dungeon", 0.8f);
+        flow = StartCoroutine(BeginRoom(0, true));
+    }
+
+    public void StartEndlessRun()
+    {
+        StopFlow();
+        if (Rooms != null) Rooms.CancelPendingVictory();
+        Time.timeScale = 1f;
+        UI.HideMenu();
+        UI.HideEnd();
+        UI.HidePause();
+        UI.ShowHud();
+        Run.StartRun(true);
         Audio.Music("music_dungeon", 0.8f);
         flow = StartCoroutine(BeginRoom(0, true));
     }
 
     public void StartNextDungeon()
     {
-        if (Run == null || Run.Dungeon == null) return;
+        if (Run == null || Run.Dungeon == null || Run.Endless) return;
         var next = MetaProgress.NextDungeon(Run.Dungeon);
         if (next == null) return;
         int index = Data.Dungeons.FindIndex(d => d.Id == next.Id);
@@ -661,8 +817,10 @@ public class Game : MonoBehaviour
         UI.HidePause();
         UI.HidePerks();
         UI.HideSkills();
+        UI.HideRest();
         UI.ShowHud();
-        Run.StartRun();
+        bool endless = Run != null && Run.Endless;
+        Run.StartRun(endless);
         Audio.Music("music_dungeon", 0.6f);
         flow = StartCoroutine(BeginRoom(0, true));
     }
@@ -674,18 +832,21 @@ public class Game : MonoBehaviour
         SkipRequested = false;
         Run.RoomIndex = index;
         Rooms.BuildRoom(index, firstRoom);
-        var rooms = Run.Dungeon.Rooms;
-        Debug.Log("[Cardboard] Enter room " + (index + 1) + " / " + Run.RoomCount + " type=" + rooms[index].Type);
+        var room = Run.RoomAt(index);
+        if (room == null)
+        {
+            ToMenu();
+            yield break;
+        }
+        bool bossRoom = Run.IsBossRoom(index);
+        Debug.Log("[Cardboard] Enter room " + (index + 1) + " / " + Run.RoomCount +
+                  " type=" + room.Type + (Run.Endless ? " endless" : ""));
         Player.RevivePosition(Rooms.PlayerSpawn);
         Player.SetVisible(true);
         Player.OnRoomStart();
         UI.RefreshRoom();
-        var room = rooms[index];
         UI.ShowBanner(room.Name, room.Subtitle, 1.8f, Data.RoomAccent(room.Type));
-        if (index == Run.RoomCount - 1)
-        {
-            Audio.Music("music_boss", 1.2f);
-        }
+        if (bossRoom) Audio.Music("music_boss", 1.2f);
         yield return WaitReal(1.3f);
         Transitioning = false;
         State = GameState.Combat;
@@ -700,7 +861,7 @@ public class Game : MonoBehaviour
             yield break;
         }
         Rooms.SpawnWave();
-        if (index == Run.RoomCount - 1)
+        if (bossRoom)
         {
             UI.ShowBossBar(true, Run.BossName);
             Audio.Play("sfx_boss_roar", 0.9f);
@@ -725,7 +886,62 @@ public class Game : MonoBehaviour
         {
             yield break;
         }
+        if (Run.Endless)
+        {
+            OfferEndlessShop();
+            yield break;
+        }
         OfferPerks("ВЫБЕРИ ПЕРК");
+    }
+
+    public void OfferEndlessShop()
+    {
+        if (Player == null || Player.Dead || State == GameState.Dead) return;
+        if (!Run.Endless) return;
+        State = GameState.Perk;
+        Time.timeScale = 0f;
+        UI.HideBanner();
+        var offers = Run.BuildShopOffers(EndlessContent.ShopOfferCount);
+        if (offers.Count == 0)
+        {
+            ContinueAfterChoice();
+            return;
+        }
+        UI.ShowShop(offers, Run.Coins, Run.RoomIndex);
+        Audio.Play("sfx_pickup", 0.7f);
+    }
+
+    public void ChooseShop(int index)
+    {
+        if (State != GameState.Perk || UI == null || !UI.ShopOpen) return;
+        var offer = UI.CurrentShopOffers != null && index >= 0 && index < UI.CurrentShopOffers.Count
+            ? UI.CurrentShopOffers[index]
+            : null;
+        if (offer == null) return;
+        string error;
+        if (!Run.TryBuy(offer, out error))
+        {
+            UI.ShowBanner("ЛАВКА", error, 1.6f, Pal.Red);
+            Audio.Play("ui_click", 0.5f, 0.7f);
+            return;
+        }
+        UI.RefreshCoins();
+        UI.RefreshSkills();
+        Audio.Play("sfx_pickup", 0.85f);
+        if (offer.Kind == ShopOfferKind.Upgrade && offer.TargetLevel >= EndlessContent.MaxSkillLevel)
+        {
+            UI.ShowBanner("МАСТЕРИЯ", offer.Skill != null
+                ? offer.Skill.Name + ": " + EndlessContent.MasteryDescription(offer.Skill.Id)
+                : "Навык достиг предела", 2.4f, Pal.Purple);
+        }
+        var offers = Run.BuildShopOffers(EndlessContent.ShopOfferCount);
+        UI.ShowShop(offers, Run.Coins, Run.RoomIndex);
+    }
+
+    public void ContinueShop()
+    {
+        if (State != GameState.Perk || UI == null || !UI.ShopOpen) return;
+        ContinueAfterChoice();
     }
 
     public void OfferPerks(string title)
@@ -828,6 +1044,7 @@ public class Game : MonoBehaviour
         UI.HidePerks();
         UI.HideSkills();
         UI.HideRest();
+        UI.HideShop();
         flow = StartCoroutine(TransitionToNextRoom());
     }
 
@@ -861,9 +1078,16 @@ public class Game : MonoBehaviour
         if (State == GameState.Dead) yield break;
         Run.RoomIndex++;
         Rooms.BuildRoom(Run.RoomIndex, false);
-        var rooms = Run.Dungeon.Rooms;
+        var room = Run.RoomAt(Run.RoomIndex);
+        if (room == null)
+        {
+            if (Run.Endless) CompleteEndlessRun();
+            else ToMenu();
+            yield break;
+        }
+        bool bossRoom = Run.IsBossRoom(Run.RoomIndex);
         Debug.Log("[Cardboard] Enter room " + (Run.RoomIndex + 1) + " / " + Run.RoomCount +
-                  " type=" + rooms[Run.RoomIndex].Type);
+                  " type=" + room.Type + (Run.Endless ? " endless" : ""));
         Player.RevivePosition(Rooms.PlayerSpawn);
         Player.SetVisible(true);
         Player.OnRoomStart();
@@ -882,19 +1106,26 @@ public class Game : MonoBehaviour
         UI.Flash(new Color(0.9f, 0.95f, 1f, 0.1f), 0.32f);
 
         UI.SetSkipHint(false);
-        var room = rooms[Run.RoomIndex];
         UI.ShowBanner(room.Name, room.Subtitle, 1.4f, Data.RoomAccent(room.Type));
         Transitioning = false;
         State = GameState.Combat;
         Player.SetControl(true);
-        if (Run.RoomIndex == Run.RoomCount - 1)
+        if (bossRoom)
         {
             Audio.Music("music_boss", 1.0f);
             Audio.Play("sfx_boss_roar", 0.9f);
             Cam.Shake(0.3f, 0.8f);
             yield return WaitReal(0.9f);
         }
+        else if (Run.Endless)
+        {
+            Audio.Music("music_dungeon", 0.8f);
+        }
         Rooms.SpawnWave();
+        if (bossRoom)
+        {
+            UI.ShowBossBar(true, Run.BossName);
+        }
         if (room.Type == RoomType.Treasure)
         {
             ShowTreasure();
@@ -924,8 +1155,28 @@ public class Game : MonoBehaviour
         Audio.Play("ui_click", 0.5f);
     }
 
+    public void CompleteEndlessRun()
+    {
+        if (Run == null || !Run.Endless || Player == null || Player.Dead) return;
+        State = GameState.Victory;
+        Transitioning = false;
+        Time.timeScale = 0f;
+        UI.SetSkipHint(false);
+        UI.ShowBossBar(false);
+        UI.HideShop();
+        Run.SaveRecord(true);
+        UI.ShowEnd(true);
+        Audio.StopMusic(0.8f);
+        Audio.Play("sfx_victory", 0.9f);
+    }
+
     public void Victory()
     {
+        if (Run != null && Run.Endless)
+        {
+            OnRoomCleared();
+            return;
+        }
         if (State != GameState.Combat || Rooms == null || !Rooms.BossDead || !Rooms.Cleared) return;
         if (Player == null || Player.Dead) return;
         StopFlow();

@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.3.2");
+        Debug.Log("[SelfTest] begin v1.4.0");
 
         CheckSkills();
         CheckPerks();
@@ -26,6 +26,7 @@ public static class SelfTest
         CheckEquipment();
         CheckAssets();
         CheckBalance();
+        CheckEndless();
 
         Debug.Log("[SelfTest] passed=" + passed + " failed=" + failed);
         return failed == 0;
@@ -565,6 +566,114 @@ public static class SelfTest
         Check(Data.Enemy(EnemyKind.Spider).Speed > imp.Speed, "spiders are faster than imps");
         Check(Data.Enemy(EnemyKind.Hound).Speed > Data.Enemy(EnemyKind.Skeleton).Speed,
             "hounds are faster than skeletons");
+    }
+
+    private static void CheckEndless()
+    {
+        Check(EndlessContent.RoomCap == 999, "endless room cap = 999");
+        Check(EndlessContent.BossEvery == 5, "endless boss every 5 rooms");
+        Check(EndlessContent.MaxSkillLevel == 5, "endless max skill level = 5");
+        Check(EndlessContent.ShopOfferCount == 3, "endless shop has three offers");
+        Check(EndlessContent.StartCoins == 25, "endless starts with 25 coins");
+
+        var dungeon = EndlessContent.Dungeon;
+        Check(dungeon != null && dungeon.Id == EndlessContent.DungeonId, "endless dungeon exists");
+        Check(Data.FindDungeon(EndlessContent.DungeonId) == null, "endless dungeon is not a story dungeon");
+        Check(dungeon.Rooms != null && dungeon.Rooms.Length == 0, "endless dungeon has no fixed rooms");
+        Check(dungeon.Pool != null && dungeon.Pool.Length >= 8, "endless enemy pool is broad");
+        Check(dungeon.Adds != null && dungeon.Adds.Length >= 8, "endless boss adds are broad");
+        foreach (var kind in dungeon.Pool)
+        {
+            Check(Data.Enemies.ContainsKey(kind), "endless pool has unknown enemy: " + kind);
+        }
+        foreach (var kind in dungeon.Adds)
+        {
+            Check(Data.Enemies.ContainsKey(kind), "endless adds have unknown enemy: " + kind);
+        }
+
+        Check(EndlessContent.IsBoss(4) && EndlessContent.IsBoss(9), "endless bosses every fifth room");
+        Check(!EndlessContent.IsBoss(0) && !EndlessContent.IsBoss(5), "endless non-boss rooms are not bosses");
+        Check(EndlessContent.BossFor(0) == EnemyKind.BoneKing, "endless boss rotation starts with bone king");
+        Check(EndlessContent.BossFor(5) == EnemyKind.SpiderQueen, "endless boss rotation continues with spider queen");
+        Check(EndlessContent.BossFor(10) == EnemyKind.Lich, "endless boss rotation continues with lich");
+        Check(EndlessContent.BossFor(15) == EnemyKind.BoneKing, "endless boss rotation loops");
+
+        var bossRoom = EndlessContent.RoomFor(4, 12345);
+        Check(bossRoom != null && bossRoom.Type == RoomType.Boss, "endless fifth room is a boss");
+        Check(bossRoom.Waves == 1, "endless boss room has one wave");
+        Check(Data.Theme(bossRoom.Theme) != null, "endless boss theme exists: " + bossRoom.Theme);
+        var eliteRoom = EndlessContent.RoomFor(2, 12345);
+        Check(eliteRoom != null && eliteRoom.Type == RoomType.Elite, "endless third room is an elite");
+        Check(eliteRoom.Waves > 0, "endless elite room has waves");
+        var combatRoom = EndlessContent.RoomFor(0, 12345);
+        Check(combatRoom != null && combatRoom.Type == RoomType.Combat, "endless first room is combat");
+        Check(combatRoom.Waves >= 2, "endless combat room has at least two waves");
+
+        var repeatA = EndlessContent.RoomFor(17, 777);
+        var repeatB = EndlessContent.RoomFor(17, 777);
+        Check(repeatA.Name == repeatB.Name && repeatA.Theme == repeatB.Theme &&
+              repeatA.Type == repeatB.Type && repeatA.Waves == repeatB.Waves,
+            "endless room generation is deterministic per seed");
+
+        for (int i = 0; i < 30; i++)
+        {
+            var room = EndlessContent.RoomFor(i, 4242);
+            Check(room != null, "endless room is null at " + i);
+            if (room == null) continue;
+            Check(!string.IsNullOrEmpty(room.Name), "endless room name is empty at " + i);
+            Check(!string.IsNullOrEmpty(room.Subtitle), "endless room subtitle is empty at " + i);
+            Check(Data.Theme(room.Theme) != null, "endless room theme missing at " + i + ": " + room.Theme);
+            Check(room.Type == RoomType.Boss || room.Type == RoomType.Elite || room.Type == RoomType.Combat,
+                "endless room has unexpected type at " + i + ": " + room.Type);
+            Check(room.Waves >= 1 && room.Waves <= 4, "endless room waves out of range at " + i);
+        }
+
+        Check(EndlessContent.EnemyHpScale(50) > EndlessContent.EnemyHpScale(10) &&
+              EndlessContent.EnemyHpScale(10) > EndlessContent.EnemyHpScale(0),
+            "endless enemy hp grows with depth");
+        Check(EndlessContent.EnemyDamageScale(50) > EndlessContent.EnemyDamageScale(10) &&
+              EndlessContent.EnemyDamageScale(10) > EndlessContent.EnemyDamageScale(0),
+            "endless enemy damage grows with depth");
+        Check(EndlessContent.EnemyHpScale(0) >= 0.999f, "endless first room hp scale starts at 1");
+        Check(EndlessContent.EnemyDamageScale(0) >= 0.999f, "endless first room damage scale starts at 1");
+
+        Check(EndlessContent.CoinDrop(true, false, 10) == 25, "endless boss coin drop scales with depth");
+        Check(EndlessContent.CoinDrop(false, true, 10) == 7, "endless elite coin drop scales with depth");
+        int normalCoins = 0;
+        for (int i = 0; i < 32; i++) normalCoins += EndlessContent.CoinDrop(false, false, 0);
+        Check(normalCoins >= 32 && normalCoins <= 64, "endless normal enemies drop 1-2 coins");
+
+        Check(EndlessContent.UpgradeCost(5, 0) > EndlessContent.UpgradeCost(4, 0) &&
+              EndlessContent.UpgradeCost(4, 0) > EndlessContent.UpgradeCost(2, 0),
+            "endless skill upgrades get more expensive");
+        Check(EndlessContent.UpgradeCost(2, 10) > EndlessContent.UpgradeCost(2, 0),
+            "endless skill upgrades scale with depth");
+        Check(EndlessContent.NewSkillCost(true, 0) > EndlessContent.NewSkillCost(false, 0),
+            "opening a slot costs extra");
+        Check(EndlessContent.PerkCost(10) > EndlessContent.PerkCost(0), "endless perks scale with depth");
+        Check(EndlessContent.HealCost(10) > EndlessContent.HealCost(0), "endless healing scales with depth");
+        Check(EndlessContent.StatCost(10) > EndlessContent.StatCost(0), "endless stats scale with depth");
+
+        var masteryLines = new HashSet<string>();
+        foreach (var skill in Data.Skills)
+        {
+            string mastery = EndlessContent.MasteryDescription(skill.Id);
+            Check(!string.IsNullOrEmpty(mastery), "endless mastery description missing: " + skill.Id);
+            Check(!mastery.StartsWith("навык получает"), "endless mastery is generic: " + skill.Id);
+            Check(masteryLines.Add(mastery), "endless mastery descriptions must be unique: " + skill.Id);
+            string effect = EndlessContent.LevelEffect(skill.Id, EndlessContent.MaxSkillLevel);
+            Check(effect.Contains("МАСТЕРИЯ"), "endless max level shows mastery: " + skill.Id);
+            Check(EndlessContent.LevelEffect(skill.Id, 2).Contains("Уровень 2"),
+                "endless skill level effect is described: " + skill.Id);
+        }
+        Check(masteryLines.Count == Data.Skills.Count, "every endless skill has unique mastery text");
+
+        var low = new SkillSystem.Slot { Level = 1 };
+        var max = new SkillSystem.Slot { Level = EndlessContent.MaxSkillLevel };
+        Check(!low.Mastery && max.Mastery, "endless skill mastery unlocks at max level");
+        Check(max.Power > low.Power && max.Area > low.Area && max.Duration > low.Duration,
+            "endless skill levels improve power, area and duration");
+        Check(ArtExists("coin"), "endless coin art exists");
     }
 
     private static bool ArtExists(string name)
