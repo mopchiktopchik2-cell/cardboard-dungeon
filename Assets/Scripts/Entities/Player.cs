@@ -68,6 +68,10 @@ public class Player : MonoBehaviour
     public Enemy CurrentTarget => currentTarget;
     public Vector2 Facing => facing;
     public float RageMult => RageTimer > 0f ? (RageMastery ? 1.75f : 1.5f) : 1f;
+    public HeroAttackStyle AttackStyle => Data.Hero(CurrentHero).Style;
+
+    private static HeroClass CurrentHero =>
+        Game.I != null && Game.I.Run != null ? Game.I.Run.Hero : MetaProgress.SelectedClass;
 
     public static Player Create(Transform parent)
     {
@@ -90,7 +94,7 @@ public class Player : MonoBehaviour
     public void ResetForRun()
     {
         Stats = new PlayerStats();
-        var hero = Data.Hero(MetaProgress.SelectedClass);
+        var hero = Data.Hero(CurrentHero);
         Stats.maxHp = hero.Hp;
         Stats.speed = hero.Speed;
         Stats.damage = hero.Damage;
@@ -124,7 +128,7 @@ public class Player : MonoBehaviour
         transform.rotation = Quaternion.identity;
         if (dashRoutine != null) StopCoroutine(dashRoutine);
         dashRoutine = null;
-        SetClassVisual(MetaProgress.SelectedClass);
+        SetClassVisual(CurrentHero);
         Visual.ResetVisual();
         Visual.SetScale(1f);
         Visual.SetTint(Color.white);
@@ -291,7 +295,7 @@ public class Player : MonoBehaviour
         if (Control)
         {
             currentTarget = Game.I.Rooms.NearestEnemy(transform.position, Stats.range);
-            bool stationaryStyle = Data.Hero(MetaProgress.SelectedClass).Style == HeroAttackStyle.Slash;
+            bool stationaryStyle = AttackStyle == HeroAttackStyle.Slash;
             bool mayAttackWhileMoving = stationaryStyle || ShadowRunTimer > 0f;
             if (currentTarget != null && autoTimer <= 0f && !dashing && (!moving || mayAttackWhileMoving))
             {
@@ -333,8 +337,7 @@ public class Player : MonoBehaviour
                        ((Vector2)transform.position + Vector2.up * 0.75f)).normalized;
         facing = dir;
         Visual.Face(dir.x);
-        var hero = Data.Hero(MetaProgress.SelectedClass);
-        switch (hero.Style)
+        switch (AttackStyle)
         {
             case HeroAttackStyle.Slash:
                 SlashAttack(dir);

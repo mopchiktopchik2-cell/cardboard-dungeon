@@ -94,6 +94,7 @@ public class Game : MonoBehaviour
         if (QA && HasArg("-qaEquip")) StartCoroutine(QaEquipShot());
         else if (QA && HasArg("-qaSettingsShot")) StartCoroutine(QaSettingsShot());
         else if (QA && HasArg("-qaMenuPages")) StartCoroutine(QaMenuPages());
+        else if (QA && HasArg("-qaClassLock")) StartCoroutine(QaClassLock());
         else if (QA && HasArg("-qaBossAttacks")) StartCoroutine(QaBossAttacks());
         else if (QA && HasArg("-qaEndless")) StartCoroutine(QaEndless());
         else if (QA && HasArg("-qaAudit")) StartCoroutine(QaAudit());
@@ -342,6 +343,44 @@ public class Game : MonoBehaviour
             Debug.LogError("[QaMenuPages] endless did not use selected class");
         }
         yield return QaShot(shotsDir, "endless_ranger_start");
+        yield return new WaitForSecondsRealtime(0.3f);
+        Application.Quit();
+    }
+
+    private IEnumerator QaClassLock()
+    {
+        string shotsDir = ArgValue("-qaShots=", Path.Combine(Application.dataPath, "qa_shots"));
+        Directory.CreateDirectory(shotsDir);
+        MetaProgress.SelectedClass = HeroClass.Swordsman;
+        MetaProgress.SelectedDungeonId = "crypt";
+        UI.ShowMenu();
+        UI.SelectClass(HeroClass.Swordsman);
+        yield return new WaitForSecondsRealtime(0.5f);
+
+        StartEndlessRun();
+        yield return QaWaitFor(() => State == GameState.Combat && Run.RoomIndex == 0, 6f);
+        string starter = Skills != null && Skills.Slots[0].Def != null ? Skills.Slots[0].Def.Id : "null";
+        bool startOk = Run != null && Run.Hero == HeroClass.Swordsman &&
+                       Player.AttackStyle == HeroAttackStyle.Slash &&
+                       Data.SkillAllowedForClass(starter, HeroClass.Swordsman);
+
+        // Имитируем случайную запись класса из меню уже во время забега.
+        MetaProgress.SelectedClass = HeroClass.Ranger;
+        yield return null;
+        starter = Skills != null && Skills.Slots[0].Def != null ? Skills.Slots[0].Def.Id : "null";
+        bool lockedOk = Run != null && Run.Hero == HeroClass.Swordsman &&
+                        Player.AttackStyle == HeroAttackStyle.Slash &&
+                        Data.SkillAllowedForClass(starter, HeroClass.Swordsman);
+
+        Debug.Log("[QaClassLock] start=" + startOk + " locked=" + lockedOk +
+                  " runHero=" + (Run != null ? Run.Hero.ToString() : "null") +
+                  " style=" + Player.AttackStyle + " skill=" + starter);
+        if (!startOk || !lockedOk)
+        {
+            Debug.LogError("[QaClassLock] endless swordsman changed class during the run");
+        }
+        MetaProgress.SelectedClass = HeroClass.Swordsman;
+        yield return QaShot(shotsDir, "endless_swordsman_start");
         yield return new WaitForSecondsRealtime(0.3f);
         Application.Quit();
     }

@@ -49,10 +49,15 @@ public class UIRoot : MonoBehaviour
     private Text menuBest;
     private Text menuEndlessBest;
     private Text menuClassTitle;
+    private Text menuClassSubtitle;
     private Text menuClassStats;
     private Text menuClassDesc;
     private Text menuDungeonTitle;
     private Text menuDungeonStats;
+    private Image menuClassIcon;
+    private Image menuClassRune;
+    private Image menuClassGlow;
+    private Image menuDungeonIcon;
     private Text heroPageHint;
     private Text dungeonPageHint;
     private Text endlessPageHint;
@@ -364,40 +369,96 @@ public class UIRoot : MonoBehaviour
         logo.gameObject.AddComponent<UIFloat>().Init(new Vector2(0f, 4.5f), 0.55f, 0f);
         logo.gameObject.AddComponent<UIPulseAlpha>().Init(0.9f, 1f, 0.5f);
 
-        TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ  ·  v1.5.0", 20, new Color(0.84f, 0.74f, 0.58f),
+        var edition = TextAt(menuRoot, "МРАЧНОЕ ПЕРЕИЗДАНИЕ", 15, new Color(0.8f, 0.71f, 0.57f),
             TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0.5f, 1f), new Vector2(0f, -244f), new Vector2(760f, 30f), art.Sans, true);
+            new Vector2(0.5f, 1f), new Vector2(0f, -246f), new Vector2(760f, 24f), art.Sans, true);
+        edition.fontStyle = FontStyle.Bold;
 
-        Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.85f),
+        Img(menuRoot, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.58f),
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -272f), new Vector2(680f, 42f), false);
+            new Vector2(0f, -272f), new Vector2(620f, 36f), false);
 
-        var summary = Img(menuRoot, art.UI("ui_card_dark", new Vector4(22f, 22f, 22f, 22f)),
-            new Color(1f, 1f, 1f, 0.88f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0.5f, 0.5f), new Vector2(0f, -28f), new Vector2(430f, 252f), true);
+        var shadow = Img(menuRoot, art.UI("fx_glow"), new Color(0f, 0f, 0f, 0.48f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -34f), new Vector2(680f, 330f), false);
+        shadow.raycastTarget = false;
+
+        var summary = Img(menuRoot, art.UI("ui_panel_dark", new Vector4(24f, 24f, 24f, 24f)),
+            Color.white, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0.5f, 0.5f), new Vector2(0f, -28f), new Vector2(540f, 250f), true);
         summary.raycastTarget = false;
 
-        menuClassTitle = TextAt(summary.rectTransform, "МАГ", 26, Pal.Gold, TextAnchor.UpperCenter,
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f),
-            new Vector2(390f, 34f), art.Serif, true);
-        menuClassStats = TextAt(summary.rectTransform, "", 14, new Color(0.86f, 0.8f, 0.66f),
-            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -48f), new Vector2(390f, 22f), art.Sans, true);
-        menuClassDesc = TextAt(summary.rectTransform, "", 13, new Color(0.78f, 0.74f, 0.7f),
-            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -72f), new Vector2(380f, 42f), art.Sans, true);
-        Img(summary.rectTransform, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.55f),
-            new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -122f),
-            new Vector2(340f, 24f), false);
-        menuDungeonTitle = TextAt(summary.rectTransform, "КОСТЯНОЙ СКЛЕП", 20, new Color(0.86f, 0.9f, 0.75f),
-            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -132f), new Vector2(390f, 26f), art.Serif, true);
-        menuDungeonStats = TextAt(summary.rectTransform, "", 13, new Color(0.82f, 0.78f, 0.7f),
-            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -160f), new Vector2(390f, 22f), art.Sans, true);
-        menuBest = TextAt(summary.rectTransform, "", 13, new Color(0.72f, 0.68f, 0.62f),
-            TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -188f), new Vector2(390f, 36f), art.Sans, true);
+        var summaryFill = Img(summary.rectTransform, art.UI("white"), new Color(0.035f, 0.025f, 0.045f, 0.95f),
+            Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, false);
+        summaryFill.rectTransform.offsetMin = new Vector2(9f, 9f);
+        summaryFill.rectTransform.offsetMax = new Vector2(-9f, -9f);
+
+        var summaryHeader = TextAt(summary.rectTransform, "ТЕКУЩИЙ ПОХОД", 12, new Color(0.7f, 0.63f, 0.52f),
+            TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(-244f, 104f), new Vector2(260f, 18f), art.Sans, true);
+        summaryHeader.fontStyle = FontStyle.Bold;
+        TextAt(summary.rectTransform, "v1.5.0", 12, new Color(0.6f, 0.54f, 0.45f),
+            TextAnchor.MiddleRight, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(1f, 0.5f), new Vector2(244f, 104f), new Vector2(80f, 18f), art.Sans, true);
+
+        Img(summary.rectTransform, art.UI("white"), new Color(0.76f, 0.64f, 0.46f, 0.28f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 91f), new Vector2(480f, 1.5f), false);
+        var headerGem = Img(summary.rectTransform, art.UI("white"), new Color(0.82f, 0.69f, 0.47f, 0.55f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 91f), new Vector2(5f, 5f), false);
+        headerGem.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+        menuClassGlow = Img(summary.rectTransform, art.UI("fx_glow"), new Color(0.4f, 0.8f, 0.8f, 0.1f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-188f, 2f), new Vector2(190f, 190f), false);
+        menuClassGlow.preserveAspect = true;
+        menuClassRune = Img(summary.rectTransform, art.UI("ui_rune"), new Color(0.4f, 0.8f, 0.8f, 0.18f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-188f, 2f), new Vector2(138f, 138f), false);
+        menuClassRune.preserveAspect = true;
+        menuClassRune.gameObject.AddComponent<UIRotate>().Speed = -2.4f;
+        menuClassIcon = Img(summary.rectTransform, art.UI("wizard"), Color.white,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-188f, 2f), new Vector2(86f, 116f), false);
+        menuClassIcon.preserveAspect = true;
+
+        Img(summary.rectTransform, art.UI("white"), new Color(0.76f, 0.64f, 0.46f, 0.2f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-112f, -13f), new Vector2(1.5f, 196f), false);
+
+        menuClassTitle = TextAt(summary.rectTransform, "МАГ", 30, Pal.Teal, TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(-96f, 66f), new Vector2(336f, 38f), art.Serif, true);
+        menuClassTitle.fontStyle = FontStyle.Bold;
+        menuClassSubtitle = TextAt(summary.rectTransform, "ПЕПЕЛЬНЫЙ УЧЕНИК", 12,
+            new Color(0.78f, 0.7f, 0.57f), TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(-96f, 40f), new Vector2(336f, 18f), art.Sans, true);
+        menuClassStats = TextAt(summary.rectTransform, "", 13, new Color(0.76f, 0.72f, 0.65f),
+            TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(-96f, 16f), new Vector2(336f, 20f), art.Sans, true);
+        menuClassDesc = TextAt(summary.rectTransform, "", 12, new Color(0.72f, 0.68f, 0.63f),
+            TextAnchor.UpperLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 1f), new Vector2(-96f, 7f), new Vector2(336f, 38f), art.Sans, true);
+        Img(summary.rectTransform, art.UI("ui_divider"), new Color(1f, 1f, 1f, 0.38f),
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(72f, -46f), new Vector2(336f, 16f), false);
+
+        menuDungeonIcon = Img(summary.rectTransform, art.UI("ui_dungeon_crypt"), Color.white,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(-64f, -84f), new Vector2(48f, 48f), false);
+        menuDungeonIcon.preserveAspect = true;
+        menuDungeonTitle = TextAt(summary.rectTransform, "КОСТЯНОЙ СКЛЕП", 21,
+            new Color(0.86f, 0.9f, 0.75f), TextAnchor.MiddleLeft,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(-28f, -69f), new Vector2(268f, 26f), art.Serif, true);
+        menuDungeonStats = TextAt(summary.rectTransform, "", 12, new Color(0.76f, 0.72f, 0.65f),
+            TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(-28f, -92f), new Vector2(268f, 18f), art.Sans, true);
+        menuBest = TextAt(summary.rectTransform, "", 11, new Color(0.68f, 0.64f, 0.58f),
+            TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 0.5f), new Vector2(-28f, -112f), new Vector2(268f, 18f), art.Sans, true);
 
         MakeButton(menuRoot, "ГЕРОИ", new Vector2(-360f, -210f), new Vector2(330f, 58f),
             ShowHeroPage, 23, false);
@@ -647,6 +708,9 @@ public class UIRoot : MonoBehaviour
 
     public void SelectClass(HeroClass hero)
     {
+        // Класс забега фиксируется при старте: меню не должно менять его
+        // посреди боя, иначе герой начнёт стрелять стрелами вместо меча.
+        if (Game.I != null && Game.I.State != GameState.Menu) return;
         MetaProgress.SelectedClass = hero;
         if (Game.I.Player != null)
         {
@@ -708,23 +772,40 @@ public class UIRoot : MonoBehaviour
                 Data.Dungeons[i].Accent.b, selected ? 1f : 0.25f);
         }
 
+        var heroDef = Data.Hero(hero.Id);
+        var heroAccent = Color.Lerp(heroDef.Accent, Color.white, 0.12f);
         if (menuHero != null)
         {
             menuHero.sprite = art.UI(hero.Sprite);
-            menuHero.color = new Color(Data.Hero(hero.Id).Accent.r, Data.Hero(hero.Id).Accent.g,
-                Data.Hero(hero.Id).Accent.b, 0.24f);
+            menuHero.color = new Color(heroDef.Accent.r, heroDef.Accent.g, heroDef.Accent.b, 0.24f);
         }
         if (menuDungeonTint != null)
         {
             menuDungeonTint.color = new Color(dungeon.Accent.r, dungeon.Accent.g, dungeon.Accent.b, 0.11f);
         }
-        if (menuClassTitle != null) menuClassTitle.text = hero.Name;
+        if (menuClassTitle != null)
+        {
+            menuClassTitle.text = hero.Name;
+            menuClassTitle.color = heroAccent;
+        }
+        if (menuClassSubtitle != null) menuClassSubtitle.text = hero.Title;
+        if (menuClassIcon != null) menuClassIcon.sprite = art.UI(hero.Sprite);
+        if (menuClassRune != null)
+        {
+            menuClassRune.color = new Color(heroDef.Accent.r, heroDef.Accent.g, heroDef.Accent.b, 0.2f);
+        }
+        if (menuClassGlow != null)
+        {
+            menuClassGlow.color = new Color(heroDef.Accent.r, heroDef.Accent.g, heroDef.Accent.b, 0.1f);
+        }
         if (menuClassStats != null)
         {
-            menuClassStats.text = "HP " + hero.Hp.ToString("0") + "  ·  УРОН " + hero.Damage.ToString("0.#") +
-                                  "  ·  " + (hero.Style == HeroAttackStyle.Slash ? "БЛИЖНИЙ БОЙ" : "ДАЛЬНИЙ БОЙ");
+            menuClassStats.text = "HP <color=#E9DCC2>" + hero.Hp.ToString("0") + "</color>  ·  УРОН <color=#E9DCC2>" +
+                                  hero.Damage.ToString("0.#") + "</color>  ·  " +
+                                  (hero.Style == HeroAttackStyle.Slash ? "БЛИЖНИЙ БОЙ" : "ДАЛЬНИЙ БОЙ");
         }
         if (menuClassDesc != null) menuClassDesc.text = hero.Desc;
+        if (menuDungeonIcon != null) menuDungeonIcon.sprite = art.UI("ui_dungeon_" + dungeon.Id);
         if (menuDungeonTitle != null)
         {
             menuDungeonTitle.text = dungeon.Name;
@@ -732,7 +813,7 @@ public class UIRoot : MonoBehaviour
         }
         if (menuDungeonStats != null)
         {
-            menuDungeonStats.text = Data.DifficultyName(dungeon.Difficulty) + "  ·  ШАНС ДОБЫЧИ " +
+            menuDungeonStats.text = "СЛОЖНОСТЬ: " + Data.DifficultyName(dungeon.Difficulty) + "  ·  ДОБЫЧА " +
                                     Mathf.RoundToInt(dungeon.DropChance * 100f) + "%";
         }
         if (menuBest != null)
@@ -741,8 +822,9 @@ public class UIRoot : MonoBehaviour
             int kills = MetaProgress.BestKills(dungeon.Id);
             int clears = MetaProgress.Clears(dungeon.Id);
             menuBest.text = best > 0
-                ? "ЛУЧШИЙ: КОМНАТА " + best + "  ·  УБИТО " + kills + "  ·  ПОБЕД " + clears
-                : "ЭТО ПОДЗЕМЕЛЬЕ ЕЩЁ НЕ ПРОЙДЕНО";
+                ? "<color=#C9B27D>РЕКОРД</color>  ·  КОМНАТА " + best + "  ·  УБИТО " + kills +
+                  "  ·  ПОБЕД " + clears
+                : "<color=#C9B27D>РЕКОРД</color>  ·  ПОДЗЕМЕЛЬЕ НЕ ПРОЙДЕНО";
         }
         if (menuEndlessBest != null)
         {
@@ -1270,7 +1352,10 @@ public class UIRoot : MonoBehaviour
             int idx = i;
             var def = CurrentSkills[i];
             float x = (i - (CurrentSkills.Count - 1) * 0.5f) * 350f;
-            float cooldown = Data.EffectiveCooldown(def, MetaProgress.SelectedClass);
+            HeroClass heroClass = Game.I != null && Game.I.InRun && Game.I.Run != null
+                ? Game.I.Run.Hero
+                : MetaProgress.SelectedClass;
+            float cooldown = Data.EffectiveCooldown(def, heroClass);
             BuildCard(perkCardsRoot, new Vector2(x, 0f), def.Icon, def.Name,
                 def.Desc + "\n<color=#BFAF96>Перезарядка: " + cooldown.ToString("0") + " сек.</color>",
                 def.Color, (i + 1).ToString(), "НАВЫК",

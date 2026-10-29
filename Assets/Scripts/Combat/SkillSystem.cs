@@ -22,6 +22,9 @@ public class SkillSystem : MonoBehaviour
     public Player Player;
     public bool CdrPulse;
 
+    private static HeroClass CurrentHero =>
+        Game.I != null && Game.I.Run != null ? Game.I.Run.Hero : MetaProgress.SelectedClass;
+
     public void Init(Player player)
     {
         Player = player;
@@ -39,7 +42,7 @@ public class SkillSystem : MonoBehaviour
             Slots[i].MaxCd = 0f;
             Slots[i].Level = 1;
         }
-        var starter = Data.StarterSkills(MetaProgress.SelectedClass);
+        var starter = Data.StarterSkills(CurrentHero);
         for (int i = 0; i < starter.Length && i < MaxSlots; i++)
         {
             Slots[i].Def = Data.Skill(starter[i]);
@@ -63,7 +66,7 @@ public class SkillSystem : MonoBehaviour
     {
         var def = Data.Skill(id);
         if (def == null) return false;
-        if (!Data.SkillAllowedForClass(id, MetaProgress.SelectedClass)) return false;
+        if (!Data.SkillAllowedForClass(id, CurrentHero)) return false;
         foreach (var s in Slots)
         {
             if (s.Def != null && s.Def.Id == id) return false;
@@ -123,7 +126,7 @@ public class SkillSystem : MonoBehaviour
         if (index >= MaxSlots) return;
         if (Player.StunTimer > 0f) return;
         if (!Cast(slot)) return;
-        float cd = Data.EffectiveCooldown(slot.Def, MetaProgress.SelectedClass) *
+        float cd = Data.EffectiveCooldown(slot.Def, CurrentHero) *
                    (1f - Mathf.Clamp(Player.Stats.cdr, 0f, 0.55f)) *
                    (1f - Mathf.Max(0, slot.Level - 1) * 0.05f) *
                    (slot.Mastery ? 0.9f : 1f);

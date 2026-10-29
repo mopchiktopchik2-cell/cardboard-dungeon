@@ -179,7 +179,7 @@ public class RunManager : MonoBehaviour
                 if (owned > 0) continue;
             }
             if (IsPerkCapped(perk)) continue;
-            if (!Data.PerkAllowedForClass(perk.Id, MetaProgress.SelectedClass)) continue;
+            if (!Data.PerkAllowedForClass(perk.Id, Hero)) continue;
             candidates.Add(perk);
         }
 
@@ -210,7 +210,7 @@ public class RunManager : MonoBehaviour
         var candidates = new List<SkillDef>();
         foreach (var s in Data.Skills)
         {
-            if (!Data.SkillAllowedForClass(s.Id, MetaProgress.SelectedClass)) continue;
+            if (!Data.SkillAllowedForClass(s.Id, Hero)) continue;
             if (!Game.I.Skills.HasSkill(s.Id)) candidates.Add(s);
         }
         var result = new List<SkillDef>();
@@ -226,7 +226,7 @@ public class RunManager : MonoBehaviour
     public bool AddPerk(PerkDef perk)
     {
         if (perk == null) return false;
-        if (!Data.PerkAllowedForClass(perk.Id, MetaProgress.SelectedClass)) return false;
+        if (!Data.PerkAllowedForClass(perk.Id, Hero)) return false;
         if (perk.Unique && PerkCounts.TryGetValue(perk.Id, out var owned) && owned > 0) return false;
         if (IsPerkCapped(perk)) return false;
         if (perk.Id == "slot" &&
@@ -330,7 +330,7 @@ public class RunManager : MonoBehaviour
         if (Game.I == null || Game.I.Skills == null) return true;
         foreach (var skill in Data.Skills)
         {
-            if (!Data.SkillAllowedForClass(skill.Id, MetaProgress.SelectedClass)) continue;
+            if (!Data.SkillAllowedForClass(skill.Id, Hero)) continue;
             if (!Game.I.Skills.HasSkill(skill.Id)) return true;
         }
         return false;
@@ -367,7 +367,7 @@ public class RunManager : MonoBehaviour
         bool emptySlot = HasEmptySlot();
         foreach (var skill in Data.Skills)
         {
-            if (!Data.SkillAllowedForClass(skill.Id, MetaProgress.SelectedClass)) continue;
+            if (!Data.SkillAllowedForClass(skill.Id, Hero)) continue;
             if (Game.I.Skills.HasSkill(skill.Id)) continue;
             if (!emptySlot && Game.I.Skills.MaxSlots >= Data.MaxSkillSlots) continue;
             newSkills.Add(NewSkillOffer(skill, !emptySlot));
