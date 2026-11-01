@@ -53,6 +53,9 @@ public class Player : MonoBehaviour
     public float SlowTimer;
     public float SlowFactor = 1f;
     public float ShadowRunTimer;
+    public float GuardTimer;
+    public float GuardReduction;
+    public bool GuardRetaliate;
 
     private float shadowTrailTimer;
     private bool dashing;
@@ -122,6 +125,9 @@ public class Player : MonoBehaviour
         SlowTimer = 0f;
         SlowFactor = 1f;
         ShadowRunTimer = 0f;
+        GuardTimer = 0f;
+        GuardReduction = 0f;
+        GuardRetaliate = false;
         shadowTrailTimer = 0f;
         autoTimer = 0f;
         currentTarget = null;
@@ -197,6 +203,9 @@ public class Player : MonoBehaviour
         SlowTimer = 0f;
         SlowFactor = 1f;
         ShadowRunTimer = 0f;
+        GuardTimer = 0f;
+        GuardReduction = 0f;
+        GuardRetaliate = false;
         shadowTrailTimer = 0f;
         Invuln = 0.4f;
         VictoryLocked = false;
@@ -229,6 +238,16 @@ public class Player : MonoBehaviour
         if (DashCd > 0f) DashCd -= dt;
         if (autoTimer > 0f) autoTimer -= dt;
         if (RageTimer > 0f) RageTimer -= dt;
+        if (GuardTimer > 0f)
+        {
+            GuardTimer -= dt;
+            if (GuardTimer <= 0f)
+            {
+                GuardTimer = 0f;
+                GuardReduction = 0f;
+                GuardRetaliate = false;
+            }
+        }
         if (StunTimer > 0f) StunTimer -= dt;
         if (CastLock > 0f) CastLock -= dt;
         if (SlowTimer > 0f)
@@ -327,6 +346,7 @@ public class Player : MonoBehaviour
         else if (PoisonTimer > 0f && RageTimer > 0f) c = new Color(0.8f, 0.75f, 0.5f);
         else if (PoisonTimer > 0f) c = new Color(0.65f, 0.95f, 0.6f);
         else if (SlowTimer > 0f) c = new Color(0.72f, 0.88f, 1f);
+        else if (GuardTimer > 0f) c = new Color(0.72f, 0.86f, 1f);
         else if (RageTimer > 0f) c = new Color(1f, 0.72f, 0.65f);
         Visual.SetTint(c);
     }
@@ -443,7 +463,14 @@ public class Player : MonoBehaviour
         if (Dead || VictoryLocked) return;
         if (QaInvincible) return;
         if (!ignoreInvuln && Invuln > 0f) return;
-        amount *= 1f - Mathf.Clamp(Stats.damageReduction, 0f, 0.7f);
+        float guard = GuardTimer > 0f ? GuardReduction : 0f;
+        amount *= 1f - Mathf.Clamp(Stats.damageReduction + guard, 0f, 0.85f);
+
+        // Оплот отражает часть уже смягчённого урона.
+        if (GuardTimer > 0f && GuardRetaliate && attacker != null && !attacker.Dead)
+        {
+            attacker.TakeDamage(amount * 0.6f, transform.position, false, false);
+        }
 
         // Шипы — ответный урон, а не удар игрока: не даём им
         // накручивать DamageDealt и лечить через вампиризм.
@@ -584,6 +611,19 @@ public class Player : MonoBehaviour
         Game.I.Fx.Ring(transform.position,
             mastery ? new Color(1f, 0.28f, 0.18f) : new Color(1f, 0.45f, 0.35f), mastery ? 1.7f : 1.1f, 0.5f);
         Game.I.Audio.Play("sfx_cast", 0.7f);
+    }
+
+    public void Bulwark(float duration, float reduction, bool retaliate = false)
+    {
+        if (Dead || duration <= 0f) return;
+        GuardTimer = Mathf.Max(GuardTimer, duration);
+        GuardReduction = Mathf.Max(GuardReduction, reduction);
+        GuardRetaliate = GuardRetaliate || retaliate;
+        Game.I.Fx.Ring(transform.position + Vector3.up * 0.5f,
+            new Color(0.55f, 0.8f, 1f), 1.3f, 0.45f);
+        Game.I.Fx.Burst("fx_shield", transform.position, 8, 1.6f, 0.4f, 0.4f,
+            new Color(0.6f, 0.85f, 1f, 0.75f), 1600);
+        Game.I.Audio.Play("sfx_shield", 0.7f);
     }
 
     public float DamageOut(float baseDamage)

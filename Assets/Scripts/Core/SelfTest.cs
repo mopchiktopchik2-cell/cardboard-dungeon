@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.5.0");
+        Debug.Log("[SelfTest] begin v1.6.0");
 
         CheckSkills();
         CheckPerks();
@@ -47,7 +47,7 @@ public static class SelfTest
 
     private static void CheckSkills()
     {
-        Check(Data.Skills.Count == 16, "skills count = 16, got " + Data.Skills.Count);
+        Check(Data.Skills.Count == 22, "skills count = 22, got " + Data.Skills.Count);
         Check(Data.MaxSkillSlots == 5, "max skill slots = 5");
         var ids = new HashSet<string>();
         foreach (var s in Data.Skills)
@@ -69,6 +69,12 @@ public static class SelfTest
         Check(Data.Skill("volley") != null, "volley exists");
         Check(Data.Skill("shadowrun") != null, "shadowrun exists");
         Check(Data.Skill("cleave") != null, "cleave exists");
+        Check(Data.Skill("charge") != null, "charge exists");
+        Check(Data.Skill("warcry") != null, "warcry exists");
+        Check(Data.Skill("bulwark") != null, "bulwark exists");
+        Check(Data.Skill("arcaneorb") != null, "arcane orb exists");
+        Check(Data.Skill("thunderstorm") != null, "thunderstorm exists");
+        Check(Data.Skill("blackhole") != null, "black hole exists");
         Check(Data.Skill("nope") == null, "unknown skill returns null");
 
         Check(Mathf.Approximately(Data.Skill("frost").Cooldown, 15f), "frost cooldown is 15");
@@ -90,6 +96,22 @@ public static class SelfTest
         Check(Data.SkillAllowedForClass("volley", HeroClass.Ranger), "volley is available to ranger");
         Check(!Data.SkillAllowedForClass("volley", HeroClass.Mage), "mage cannot learn volley");
         Check(!Data.SkillAllowedForClass("volley", HeroClass.Swordsman), "swordsman cannot learn volley");
+        Check(Data.SkillAllowedForClass("charge", HeroClass.Swordsman) &&
+              Data.SkillAllowedForClass("warcry", HeroClass.Swordsman) &&
+              Data.SkillAllowedForClass("bulwark", HeroClass.Swordsman),
+            "knight gets charge, warcry and bulwark");
+        Check(!Data.SkillAllowedForClass("charge", HeroClass.Mage) &&
+              !Data.SkillAllowedForClass("warcry", HeroClass.Ranger) &&
+              !Data.SkillAllowedForClass("bulwark", HeroClass.Mage),
+            "knight skills stay knight-only");
+        Check(Data.SkillAllowedForClass("arcaneorb", HeroClass.Mage) &&
+              Data.SkillAllowedForClass("thunderstorm", HeroClass.Mage) &&
+              Data.SkillAllowedForClass("blackhole", HeroClass.Mage),
+            "mage gets arcane orb, thunderstorm and black hole");
+        Check(!Data.SkillAllowedForClass("arcaneorb", HeroClass.Swordsman) &&
+              !Data.SkillAllowedForClass("thunderstorm", HeroClass.Ranger) &&
+              !Data.SkillAllowedForClass("blackhole", HeroClass.Swordsman),
+            "mage skills stay mage-only");
         Check(!Data.SkillAllowedForClass("frost", HeroClass.Ranger), "ranger cannot learn frost");
         Check(Data.SkillAllowedForClass("heal", HeroClass.Mage) &&
               Data.SkillAllowedForClass("heal", HeroClass.Swordsman) &&
@@ -298,15 +320,23 @@ public static class SelfTest
 
     private static void CheckEnemies()
     {
-        Check(Data.Enemies.Count == 14, "enemy count = 14, got " + Data.Enemies.Count);
+        Check(Data.Enemies.Count == 20, "enemy count = 20, got " + Data.Enemies.Count);
         var sprites = new HashSet<string>();
         var specials = new HashSet<string>();
         var bossKinds = new HashSet<EnemyKind>
         {
-            EnemyKind.BoneKing, EnemyKind.SpiderQueen, EnemyKind.Lich
+            EnemyKind.BoneKing, EnemyKind.SpiderQueen, EnemyKind.Lich,
+            EnemyKind.LichArchivist, EnemyKind.AbyssColossus
+        };
+        var miniBossKinds = new HashSet<EnemyKind>
+        {
+            EnemyKind.BoneCaptain, EnemyKind.BroodMother,
+            EnemyKind.PlagueBaron, EnemyKind.AbyssKnight
         };
         int bosses = 0;
+        int miniBosses = 0;
         float strongestRegular = 0f;
+        float weakestBoss = float.MaxValue;
         foreach (EnemyKind kind in System.Enum.GetValues(typeof(EnemyKind)))
         {
             Check(Data.Enemies.ContainsKey(kind), "enemy definition missing: " + kind);
@@ -320,16 +350,32 @@ public static class SelfTest
             Check(e.Range > 0f, "enemy range must be positive: " + kind);
             Check(e.Scale > 0.4f && e.Scale < 2.5f, "enemy scale out of range: " + kind);
             Check(ArtExists(e.Sprite), "enemy sprite missing: " + e.Sprite);
-            Check(sprites.Add(e.Sprite), "enemy sprite reused: " + e.Sprite);
+            if (e.MiniBoss)
+            {
+                Check(e.Tint != Color.white, "mini-boss must be tinted: " + kind);
+            }
+            else
+            {
+                Check(sprites.Add(e.Sprite), "enemy sprite reused: " + e.Sprite);
+            }
             Check(!string.IsNullOrEmpty(e.Special), "enemy special missing: " + kind);
             Check(specials.Add(e.Special), "enemy special reused: " + e.Special);
             Check(e.Boss == bossKinds.Contains(kind), "enemy boss flag mismatch: " + kind);
+            Check(e.MiniBoss == miniBossKinds.Contains(kind), "enemy mini-boss flag mismatch: " + kind);
             if (e.Boss)
             {
                 bosses++;
+                weakestBoss = Mathf.Min(weakestBoss, e.Hp);
                 Check(e.Hp >= 900f, "boss hp too low: " + kind);
                 Check(!string.IsNullOrEmpty(e.Projectile) && ArtExists(e.Projectile),
                     "boss projectile missing: " + kind);
+            }
+            else if (e.MiniBoss)
+            {
+                miniBosses++;
+                Check(e.Hp > 200f, "mini-boss hp too low: " + kind);
+                Check(!string.IsNullOrEmpty(e.Projectile) && ArtExists(e.Projectile),
+                    "mini-boss projectile missing: " + kind);
             }
             else
             {
@@ -337,14 +383,26 @@ public static class SelfTest
             }
         }
 
-        Check(bosses == 3, "exactly three bosses, got " + bosses);
+        Check(bosses == 5, "exactly five bosses, got " + bosses);
+        Check(miniBosses == 4, "exactly four mini-bosses, got " + miniBosses);
         foreach (var kind in bossKinds)
         {
             var boss = Data.Enemy(kind);
             Check(boss != null && boss.Hp > strongestRegular * 4f,
                 "boss must be much tougher than regular enemies: " + kind);
         }
-        Check(Data.Enemy(EnemyKind.Lich).Hp > Data.Enemy(EnemyKind.SpiderQueen).Hp, "lich is the final boss");
+        foreach (var kind in miniBossKinds)
+        {
+            var mini = Data.Enemy(kind);
+            Check(mini != null && mini.Hp > strongestRegular * 1.3f && mini.Hp < weakestBoss,
+                "mini-boss sits between elites and bosses: " + kind);
+        }
+        Check(Data.Enemy(EnemyKind.Lich).Hp > Data.Enemy(EnemyKind.SpiderQueen).Hp,
+            "lich is tougher than the spider queen");
+        Check(Data.Enemy(EnemyKind.LichArchivist).Hp > Data.Enemy(EnemyKind.Lich).Hp,
+            "lich archivist is a late endless boss");
+        Check(Data.Enemy(EnemyKind.AbyssColossus).Hp > Data.Enemy(EnemyKind.LichArchivist).Hp,
+            "abyss colossus is the deepest endless boss");
         Check(Data.Enemy(EnemyKind.SpiderQueen).Hp > Data.Enemy(EnemyKind.BoneKing).Hp,
             "spider queen is harder than bone king");
         Check(Data.Enemy(EnemyKind.Executioner).Hp > Data.Enemy(EnemyKind.Guard).Hp,
@@ -572,6 +630,7 @@ public static class SelfTest
     {
         Check(EndlessContent.RoomCap == 999, "endless room cap = 999");
         Check(EndlessContent.BossEvery == 5, "endless boss every 5 rooms");
+        Check(EndlessContent.MiniBossEvery == 3, "endless mini-boss every 3 rooms");
         Check(EndlessContent.MaxSkillLevel == 5, "endless max skill level = 5");
         Check(EndlessContent.ShopOfferCount == 3, "endless shop has three offers");
         Check(EndlessContent.StartCoins == 40, "endless starts with 40 coins");
@@ -596,7 +655,26 @@ public static class SelfTest
         Check(EndlessContent.BossFor(0) == EnemyKind.BoneKing, "endless boss rotation starts with bone king");
         Check(EndlessContent.BossFor(5) == EnemyKind.SpiderQueen, "endless boss rotation continues with spider queen");
         Check(EndlessContent.BossFor(10) == EnemyKind.Lich, "endless boss rotation continues with lich");
-        Check(EndlessContent.BossFor(15) == EnemyKind.BoneKing, "endless boss rotation loops");
+        Check(EndlessContent.BossFor(15) == EnemyKind.LichArchivist,
+            "endless boss rotation continues with lich archivist");
+        Check(EndlessContent.BossFor(20) == EnemyKind.AbyssColossus,
+            "endless boss rotation continues with abyss colossus");
+        Check(EndlessContent.BossFor(25) == EnemyKind.BoneKing, "endless boss rotation loops");
+
+        Check(EndlessContent.IsMiniBossRoom(2) && EndlessContent.IsMiniBossRoom(5),
+            "endless mini-bosses appear every third room");
+        Check(!EndlessContent.IsMiniBossRoom(4) && !EndlessContent.IsMiniBossRoom(14),
+            "boss rooms are not mini-boss rooms");
+        Check(EndlessContent.MiniBossFor(2) == EnemyKind.BoneCaptain,
+            "endless mini-boss rotation starts with bone captain");
+        Check(EndlessContent.MiniBossFor(5) == EnemyKind.BroodMother,
+            "endless mini-boss rotation continues with brood mother");
+        Check(EndlessContent.MiniBossFor(8) == EnemyKind.PlagueBaron,
+            "endless mini-boss rotation continues with plague baron");
+        Check(EndlessContent.MiniBossFor(11) == EnemyKind.AbyssKnight,
+            "endless mini-boss rotation continues with abyss knight");
+        Check(EndlessContent.MiniBossFor(17) == EnemyKind.BroodMother,
+            "endless mini-boss rotation loops");
 
         var bossRoom = EndlessContent.RoomFor(4, 12345);
         Check(bossRoom != null && bossRoom.Type == RoomType.Boss, "endless fifth room is a boss");
@@ -636,9 +714,17 @@ public static class SelfTest
             "endless enemy damage grows with depth");
         Check(EndlessContent.EnemyHpScale(0) >= 0.999f, "endless first room hp scale starts at 1");
         Check(EndlessContent.EnemyDamageScale(0) >= 0.999f, "endless first room damage scale starts at 1");
+        float oldHp50 = 1f + 0.085f * 50f + 0.0012f * 50f * 50f;
+        float oldDamage50 = 1f + 0.045f * 50f + 0.0004f * 50f * 50f;
+        Check(Mathf.Abs(EndlessContent.EnemyHpScale(50) - oldHp50 * 2f) < 0.01f,
+            "endless hp scale is doubled by room 50");
+        Check(Mathf.Abs(EndlessContent.EnemyDamageScale(50) - oldDamage50 * 2f) < 0.01f,
+            "endless damage scale is doubled by room 50");
 
         Check(EndlessContent.CoinDrop(true, false, 10) == 50, "endless boss coin drop scales with depth");
         Check(EndlessContent.CoinDrop(false, true, 10) == 13, "endless elite coin drop scales with depth");
+        Check(EndlessContent.CoinDrop(false, false, 10, true) == 28,
+            "endless mini-boss coin drop is richer than elite");
         int normalCoins = 0;
         for (int i = 0; i < 32; i++) normalCoins += EndlessContent.CoinDrop(false, false, 0);
         Check(normalCoins >= 64 && normalCoins <= 128, "endless normal enemies drop 2-4 coins");

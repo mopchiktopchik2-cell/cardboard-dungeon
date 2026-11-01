@@ -77,6 +77,17 @@ public class RunManager : MonoBehaviour
         endlessRooms.Clear();
         Game.I.Player.ResetForRun();
         Game.I.Skills.ResetForRun();
+        if (endless)
+        {
+            // В Разломе герой сразу получает первый стак вампиризма.
+            Game.I.Player.Stats.lifesteal = Mathf.Max(Game.I.Player.Stats.lifesteal, Data.LifestealPerPerk);
+            var lifesteal = Data.Perk("lifesteal");
+            if (lifesteal != null)
+            {
+                PerkCounts[lifesteal.Id] = 1;
+                TakenPerks.Add(lifesteal);
+            }
+        }
         foreach (var slot in Game.I.Skills.Slots)
         {
             if (slot.Def != null) SkillLevels[slot.Def.Id] = 1;
@@ -148,7 +159,7 @@ public class RunManager : MonoBehaviour
         Kills++;
         if (Endless && enemy != null)
         {
-            int drop = EndlessContent.CoinDrop(enemy.Boss, enemy.Elite, RoomIndex);
+            int drop = EndlessContent.CoinDrop(enemy.Boss, enemy.Elite, RoomIndex, enemy.MiniBoss);
             CoinPickup.Drop(enemy.transform.position, drop);
         }
     }

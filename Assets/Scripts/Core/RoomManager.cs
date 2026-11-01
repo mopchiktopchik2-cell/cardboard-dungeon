@@ -468,6 +468,11 @@ public class RoomManager : MonoBehaviour
         bool elite = CurrentRoom.Type == RoomType.Elite ||
                      (Game.I.Run.RoomIndex >= 7 && WaveIndex >= 1 &&
                       (Game.I.Run.RoomIndex + WaveIndex) % 2 == 0);
+        if (Game.I.Run.Endless && CurrentRoom.Type == RoomType.Elite &&
+            WaveIndex == 0 && comp.Count > 0)
+        {
+            comp[0] = EndlessContent.MiniBossFor(Game.I.Run.RoomIndex);
+        }
         WaveIndex++;
         if (waveRoutine != null) StopCoroutine(waveRoutine);
         waveRoutine = StartCoroutine(SpawnRoutine(comp, elite, CombatToken, Game.I.Run.RunId, Game.I.Run.RoomIndex));
@@ -490,8 +495,9 @@ public class RoomManager : MonoBehaviour
                 waveRoutine = null;
                 yield break;
             }
-            Vector2 pos = PickSpawn();
-            SpawnOne(comp[i], eliteFirst && i == 0, pos);
+            bool miniBoss = Data.Enemies[comp[i]].MiniBoss;
+            Vector2 pos = miniBoss ? PickSpawnNear(new Vector2(3.2f, 0f), 2.4f) : PickSpawn();
+            SpawnOne(comp[i], eliteFirst && i == 0 && !miniBoss, pos);
             yield return new WaitForSeconds(0.11f);
         }
         WaveSpawning = false;
@@ -504,7 +510,7 @@ public class RoomManager : MonoBehaviour
         if (BossDead || Game.I == null || Game.I.State != GameState.Combat) return;
         var e = Enemy.Spawn(kind, pos, Game.I.Run.EnemyHpScale, Game.I.Run.EnemyDamageScale, elite);
         Enemies.Add(e);
-        if (e.Boss)
+        if (e.Boss || e.MiniBoss)
         {
             Game.I.UI.ShowBossBar(true, e.Def.Name);
         }
@@ -517,7 +523,18 @@ public class RoomManager : MonoBehaviour
         EnemyKind[] adds = dungeon != null && dungeon.Adds != null && dungeon.Adds.Length > 0
             ? dungeon.Adds
             : new[] { EnemyKind.Imp, EnemyKind.Skeleton };
-        if (dungeon != null && Game.I.Run.BossKind == EnemyKind.SpiderQueen)
+        Enemy owner = null;
+        foreach (var e in Enemies)
+        {
+            if (e != null && !e.Dead && (e.Boss || e.MiniBoss))
+            {
+                owner = e;
+                break;
+            }
+        }
+        if ((owner != null && (owner.Def.Kind == EnemyKind.SpiderQueen ||
+                               owner.Def.Kind == EnemyKind.BroodMother)) ||
+            (owner == null && dungeon != null && Game.I.Run.BossKind == EnemyKind.SpiderQueen))
         {
             adds = new[] { EnemyKind.Spider };
         }
@@ -632,6 +649,10 @@ public class RoomManager : MonoBehaviour
         {
             BossDefeated();
             return;
+        }
+        if (enemy != null && enemy.MiniBoss && Game.I != null && Game.I.UI != null)
+        {
+            Game.I.UI.ShowBossBar(false);
         }
         CheckClear();
     }

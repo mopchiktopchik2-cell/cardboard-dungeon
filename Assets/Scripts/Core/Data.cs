@@ -25,7 +25,13 @@ public enum EnemyKind
     PlagueDoctor,
     Hound,
     BoneKing,
-    SpiderQueen
+    SpiderQueen,
+    BoneCaptain,
+    BroodMother,
+    PlagueBaron,
+    AbyssKnight,
+    LichArchivist,
+    AbyssColossus
 }
 
 public class SkillDef
@@ -80,6 +86,8 @@ public class EnemyDef
     public float Cooldown;
     public float Scale;
     public bool Boss;
+    public bool MiniBoss;
+    public Color Tint = Color.white;
     public string Projectile = "proj_skull";
     public string Special;
 
@@ -175,7 +183,19 @@ public static partial class Data
         new SkillDef("shadowrun", "ТЕНЕВОЙ БЕГ", "3 секунды неуязвимости. Можно стрелять на бегу.", 9f,
             "icon_blink", Pal.Green),
         new SkillDef("cleave", "КРУГОВОЙ УДАР", "Герой замирает и бьёт всех вокруг с повышенным уроном.", 8f,
-            "icon_perk_damage", Pal.Gold)
+            "icon_perk_damage", Pal.Gold),
+        new SkillDef("charge", "ТАРАННЫЙ РЫВОК", "Рыцарь проносится вперёд, сбивая и оглушая врагов на пути.", 9f,
+            "icon_perk_speed", Pal.Gold),
+        new SkillDef("warcry", "БОЕВОЙ КЛИЧ", "Рёв вокруг: урон, замедление врагов и щит рыцарю.", 14f,
+            "icon_rage", Pal.Red),
+        new SkillDef("bulwark", "ОПЛОТ", "4 секунды рыцарь получает на 40% меньше урона.", 16f,
+            "icon_shield", Pal.Blue),
+        new SkillDef("arcaneorb", "ТАЙНАЯ СФЕРА", "Медленная сфера пробивает врагов, взрывается и замедляет.", 8f,
+            "icon_missiles", Pal.Purple),
+        new SkillDef("thunderstorm", "ГРОЗА", "Пять ударов молний по врагам вокруг героя.", 15f,
+            "icon_chain", Pal.Gold),
+        new SkillDef("blackhole", "ЧЁРНАЯ ДЫРА", "Стягивает врагов в точку и жжёт их 2 секунды.", 18f,
+            "icon_clock", Pal.Purple)
     };
 
     public static readonly List<PerkDef> Perks = new List<PerkDef>
@@ -286,6 +306,48 @@ public static partial class Data
             Kind = EnemyKind.SpiderQueen, Name = "МАТКА ПАУКОВ", Sprite = "spider_queen",
             Hp = 1260, Speed = 1.65f, Damage = 23, Range = 7.2f, Cooldown = 2.0f, Scale = 1.5f,
             Boss = true, Projectile = "proj_poison", Special = "brood_call"
+        },
+        [EnemyKind.BoneCaptain] = new EnemyDef
+        {
+            Kind = EnemyKind.BoneCaptain, Name = "КОСТЯНОЙ КАПИТАН", Sprite = "bone_captain",
+            Hp = 300, Speed = 1.7f, Damage = 24, Range = 1.35f, Cooldown = 2.0f, Scale = 1.18f,
+            MiniBoss = true, Tint = new Color(0.9f, 1f, 1f), Projectile = "proj_bone",
+            Special = "grave_command"
+        },
+        [EnemyKind.BroodMother] = new EnemyDef
+        {
+            Kind = EnemyKind.BroodMother, Name = "МАТКА ВЫВОДКА", Sprite = "brood_mother",
+            Hp = 260, Speed = 1.85f, Damage = 20, Range = 1.4f, Cooldown = 1.75f, Scale = 1.16f,
+            MiniBoss = true, Tint = new Color(1f, 0.9f, 0.96f), Projectile = "proj_poison",
+            Special = "brood_guard"
+        },
+        [EnemyKind.PlagueBaron] = new EnemyDef
+        {
+            Kind = EnemyKind.PlagueBaron, Name = "ЧУМНОЙ БАРОН", Sprite = "plague_baron",
+            Hp = 240, Speed = 2.0f, Damage = 19, Range = 6.2f, Cooldown = 2.3f, Scale = 1.2f,
+            MiniBoss = true, Tint = new Color(0.94f, 1f, 0.9f), Projectile = "proj_poison",
+            Special = "plague_edict"
+        },
+        [EnemyKind.AbyssKnight] = new EnemyDef
+        {
+            Kind = EnemyKind.AbyssKnight, Name = "РЫЦАРЬ БЕЗДНЫ", Sprite = "abyss_knight",
+            Hp = 340, Speed = 1.6f, Damage = 28, Range = 1.35f, Cooldown = 2.0f, Scale = 1.2f,
+            MiniBoss = true, Tint = new Color(0.92f, 0.9f, 1f), Projectile = "proj_soul",
+            Special = "abyss_cleave"
+        },
+        [EnemyKind.LichArchivist] = new EnemyDef
+        {
+            Kind = EnemyKind.LichArchivist, Name = "ЛИЧ-АРХИВАРИУС", Sprite = "lich_archivist",
+            Hp = 2100, Speed = 1.55f, Damage = 30, Range = 8f, Cooldown = 2.0f, Scale = 1.55f,
+            Boss = true, Projectile = "proj_skull",
+            Special = "archive_storm"
+        },
+        [EnemyKind.AbyssColossus] = new EnemyDef
+        {
+            Kind = EnemyKind.AbyssColossus, Name = "КОЛОСС БЕЗДНЫ", Sprite = "abyss_colossus",
+            Hp = 2600, Speed = 1.35f, Damage = 35, Range = 7f, Cooldown = 2.3f, Scale = 1.75f,
+            Boss = true, Projectile = "proj_bone",
+            Special = "abyss_quake"
         }
     };
 
@@ -320,12 +382,13 @@ public static partial class Data
     // голем и базовые перки, которые не относятся к чужой школе.
     private static readonly string[] MageSkillIds =
     {
-        "fireball", "nova", "chain", "meteor", "blink", "missiles", "slow", "frost", "heal", "golem"
+        "fireball", "nova", "chain", "meteor", "blink", "missiles", "slow", "frost", "heal", "golem",
+        "arcaneorb", "thunderstorm", "blackhole"
     };
 
     private static readonly string[] SwordsmanSkillIds =
     {
-        "shield", "cleave", "rage", "heal", "golem"
+        "shield", "cleave", "rage", "heal", "golem", "charge", "warcry", "bulwark"
     };
 
     private static readonly string[] RangerSkillIds =

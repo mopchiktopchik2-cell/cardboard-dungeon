@@ -396,8 +396,184 @@ public class SkillSystem : MonoBehaviour
                 Game.I.Fx.Ring(pos, new Color(1f, 0.4f, 0.3f), 1.5f, 0.4f);
                 return true;
             }
+            case "charge":
+            {
+                StartCoroutine(ChargeRoutine(player, slot));
+                return true;
+            }
+            case "warcry":
+            {
+                float radius = 3.6f * area;
+                float damage = player.DamageOut(18f * power);
+                foreach (var e in rooms.EnemiesInRadius(pos, radius))
+                {
+                    if (e == null || e.Dead) continue;
+                    e.TakeDamage(damage, pos, true, false);
+                    e.Slow(2.4f, 0.45f);
+                    if (slot.Mastery) e.Stun(1.1f);
+                }
+                player.AddShield(player.Stats.maxHp * (slot.Mastery ? 0.18f : 0.10f), 5f);
+                player.Rage(4f * slot.Duration, false);
+                Game.I.Fx.Ring(pos, new Color(1f, 0.55f, 0.35f), radius, 0.5f);
+                Game.I.Fx.Burst("fx_dust", pos, 14, 3.6f, 0.5f, 0.6f,
+                    new Color(1f, 0.75f, 0.4f, 0.8f), 1610);
+                Game.I.Audio.Play("sfx_boss_roar", 0.7f, 1.2f);
+                Game.I.Shake(0.18f, 0.3f);
+                return true;
+            }
+            case "bulwark":
+            {
+                player.Bulwark(4f * slot.Duration, slot.Mastery ? 0.55f : 0.40f, slot.Mastery);
+                return true;
+            }
+            case "arcaneorb":
+            {
+                if (target == null) return false;
+                Vector2 aim = ((Vector2)target.transform.position + Vector2.up * 0.5f - origin).normalized;
+                float aoe = (slot.Mastery ? 2.8f : 2.1f) * area;
+                Projectile.Player(origin, aim, player.DamageOut(24f * power), 7.5f, "proj_soul",
+                    new Color(0.8f, 0.6f, 1f), 1.9f, slot.Mastery ? 4 : 2, aoe,
+                    false, true, false, false, 2.4f);
+                Game.I.Fx.Sprite("fx_soul", origin, 0.7f, 0.22f,
+                    new Color(0.8f, 0.6f, 1f, 0.8f), 1560);
+                Game.I.Audio.Play("sfx_cast", 0.7f, 1.2f);
+                return true;
+            }
+            case "thunderstorm":
+            {
+                StartCoroutine(ThunderstormRoutine(player, slot));
+                return true;
+            }
+            case "blackhole":
+            {
+                Vector2 center = target != null
+                    ? (Vector2)target.transform.position
+                    : pos + player.Facing * 3f;
+                center = rooms.Clamp(center, 0.8f);
+                StartCoroutine(BlackHoleRoutine(player, slot, center));
+                return true;
+            }
         }
         return false;
+    }
+
+    private IEnumerator ChargeRoutine(Player player, Slot slot)
+    {
+        Vector2 dir = player.Facing;
+        if (dir.sqrMagnitude < 0.1f) dir = Vector2.right;
+        dir.Normalize();
+        float distance = (slot.Mastery ? 5.2f : 4.0f) * slot.Area;
+        float duration = 0.24f;
+        float radius = (slot.Mastery ? 1.35f : 1.1f) * slot.Area;
+        float damage = player.DamageOut(30f * slot.Power);
+        float stunTime = slot.Mastery ? 1.3f : 0.7f;
+        player.CastLock = Mathf.Max(player.CastLock, duration + 0.12f);
+        player.Invuln = Mathf.Max(player.Invuln, duration + 0.05f);
+        Game.I.Fx.Line(player.transform.position + Vector3.up * 0.5f,
+            player.transform.position + (Vector3)(dir * distance) + Vector3.up * 0.5f,
+            new Color(1f, 0.8f, 0.4f, 0.55f), 0.14f, duration);
+        Game.I.Audio.Play("sfx_dash", 0.8f, 0.9f);
+
+        var hit = new HashSet<Enemy>();
+        float t = 0f;
+        while (t < duration)
+        {
+            if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead)
+                yield break;
+            t += Time.deltaTime;
+            Vector2 step = dir * (distance / duration) * Time.deltaTime;
+            player.transform.position = Game.I.Rooms.Move(player.transform.position, step, 0.4f);
+            Game.I.Fx.Afterimage(player.Visual.Main);
+            foreach (var e in Game.I.Rooms.EnemiesInRadius(player.transform.position, radius))
+            {
+                if (e == null || e.Dead || !hit.Add(e)) continue;
+                e.TakeDamage(damage, player.transform.position, true, false);
+                e.Stun(stunTime);
+                Game.I.Fx.Slash(e.transform.position, dir);
+            }
+            yield return null;
+        }
+        Game.I.Fx.Ring(player.transform.position, new Color(1f, 0.8f, 0.4f, 0.8f), radius * 1.4f, 0.35f);
+        Game.I.Audio.Play("sfx_hit", 0.8f, 0.7f);
+        Game.I.Shake(0.16f, 0.25f);
+    }
+
+    private IEnumerator ThunderstormRoutine(Player player, Slot slot)
+    {
+        int strikes = slot.Mastery ? 8 : 5;
+        float radius = (slot.Mastery ? 1.8f : 1.5f) * slot.Area;
+        float damage = player.DamageOut(26f * slot.Power);
+        for (int i = 0; i < strikes; i++)
+        {
+            if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead)
+                yield break;
+            var targets = Game.I.Rooms.NearestEnemies(player.transform.position, 10f, 1);
+            Vector2 p = targets.Count > 0 && targets[0] != null
+                ? (Vector2)targets[0].transform.position
+                : (Vector2)player.transform.position + Random.insideUnitCircle * 4f;
+            p = Game.I.Rooms.Clamp(p, 0.7f);
+            Game.I.Fx.TelegraphedCircle(p, radius, 0.32f, new Color(1f, 0.9f, 0.45f));
+            yield return new WaitForSeconds(0.32f);
+            if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead)
+                yield break;
+            Game.I.Fx.Line(p + Vector2.up * 5f, p,
+                new Color(1f, 0.9f, 0.45f, 0.95f), 0.18f, 0.25f);
+            Game.I.Fx.Explosion(p, radius, new Color(1f, 0.85f, 0.35f));
+            Game.I.Rooms.DamageEnemies(p, radius, damage);
+            if (slot.Mastery)
+            {
+                foreach (var e in Game.I.Rooms.EnemiesInRadius(p, radius))
+                {
+                    if (e != null && !e.Dead) e.Stun(0.5f);
+                }
+            }
+            Game.I.Audio.Play("sfx_lightning", 0.55f, 1.1f);
+            yield return new WaitForSeconds(0.18f);
+        }
+    }
+
+    private IEnumerator BlackHoleRoutine(Player player, Slot slot, Vector2 center)
+    {
+        float duration = (slot.Mastery ? 3.0f : 2.2f) * slot.Duration;
+        float radius = (slot.Mastery ? 3.8f : 3.2f) * slot.Area;
+        float pullRadius = radius * 2.1f;
+        float tick = 0f;
+        float pulse = 0f;
+        Game.I.Fx.Ring(center, new Color(0.65f, 0.35f, 1f, 0.8f), radius, 0.5f);
+        while (duration > 0f)
+        {
+            if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead)
+                yield break;
+            float dt = Time.deltaTime;
+            duration -= dt;
+            pulse -= dt;
+            tick -= dt;
+            foreach (var e in Game.I.Rooms.EnemiesInRadius(center, pullRadius))
+            {
+                if (e != null && !e.Dead) e.Pull(center, 5.5f);
+            }
+            if (tick <= 0f)
+            {
+                tick = 0.45f;
+                Game.I.Rooms.DamageEnemies(center, radius, player.DamageOut(9f * slot.Power));
+                Game.I.Fx.Sprite("fx_soul", center, radius * 0.7f, 0.3f,
+                    new Color(0.7f, 0.4f, 1f, 0.35f), 1500);
+            }
+            if (pulse <= 0f)
+            {
+                pulse = 0.5f;
+                Game.I.Fx.Ring(center, new Color(0.65f, 0.35f, 1f, 0.5f), radius * 0.8f, 0.4f);
+                Game.I.Audio.Play("sfx_cast", 0.3f, 0.7f);
+            }
+            yield return null;
+        }
+        if (Game.I == null || Game.I.State != GameState.Combat || player == null || player.Dead)
+            yield break;
+        Game.I.Fx.Explosion(center, radius * 1.2f, new Color(0.7f, 0.35f, 1f));
+        Game.I.Rooms.DamageEnemies(center, radius * 1.2f,
+            player.DamageOut((slot.Mastery ? 55f : 28f) * slot.Power));
+        Game.I.Shake(0.3f, 0.5f);
+        Game.I.Audio.Play("sfx_explosion", 0.9f, 0.8f);
     }
 
     private void NovaPulse(Vector2 pos, float radius, float damage, Player player)

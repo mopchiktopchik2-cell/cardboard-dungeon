@@ -10,6 +10,7 @@ public class Enemy : MonoBehaviour
     public float Damage;
     public bool Elite;
     public bool Boss;
+    public bool MiniBoss;
     public bool Dead;
     public PaperActor Visual;
     public WorldBar Bar;
@@ -75,12 +76,13 @@ public class Enemy : MonoBehaviour
     private void Build(EnemyKind kind, float hpScale, float damageScale, bool elite)
     {
         Def = Data.Enemy(kind);
-        Elite = elite;
+        Elite = elite && !Def.MiniBoss;
+        MiniBoss = Def.MiniBoss;
         Boss = Def.Boss;
-        MaxHp = Def.Hp * hpScale * (elite ? 2.1f : 1f);
+        MaxHp = Def.Hp * hpScale * (Elite ? 2.1f : 1f);
         Hp = MaxHp;
-        Damage = Def.Damage * damageScale * (elite ? 1.25f : 1f);
-        float scale = Def.Scale * (elite ? 1.14f : 1f);
+        Damage = Def.Damage * damageScale * (Elite ? 1.25f : 1f);
+        float scale = Def.Scale * (Elite ? 1.14f : 1f);
         radius = 0.34f * scale;
         if (Boss)
         {
@@ -88,23 +90,30 @@ public class Enemy : MonoBehaviour
             radius = 0.55f;
             Damage *= 1.15f;
         }
+        else if (MiniBoss)
+        {
+            radius = 0.42f * scale;
+        }
 
-        baseTint = elite ? new Color(1f, 0.92f, 0.7f) : Color.white;
+        baseTint = Def.Tint != Color.white
+            ? Def.Tint
+            : Elite ? new Color(1f, 0.92f, 0.7f) : Color.white;
         Visual = PaperActor.Create(transform, Game.I.Art, Def.Sprite, scale, baseTint, true, false);
-        Visual.StepDust = Boss || elite;
+        Visual.StepDust = Boss || Elite || MiniBoss;
         Visual.Main.sortingOrder = 1000;
         Visual.SpawnPop(0.4f);
-        if (elite) Visual.AddAura(Game.I.Art, Pal.Gold, 1.35f);
-        if (Boss)
+        if (Elite) Visual.AddAura(Game.I.Art, Pal.Gold, 1.35f);
+        if (Boss || MiniBoss)
         {
-            Visual.AddAura(Game.I.Art, BossAccent(), 1.6f);
+            Visual.AddAura(Game.I.Art, BossAccent(), MiniBoss ? 1.4f : 1.6f);
         }
 
         float h = Visual.Main.sprite.bounds.size.y * scale;
         if (!Boss)
         {
-            Bar = WorldBar.Create(transform, Game.I.Art, elite ? 1.25f : 0.95f, 0.1f,
-                elite ? Pal.Gold : Pal.Red, elite);
+            Bar = WorldBar.Create(transform, Game.I.Art,
+                MiniBoss ? 1.55f : Elite ? 1.25f : 0.95f, 0.1f,
+                MiniBoss ? Pal.Purple : Elite ? Pal.Gold : Pal.Red, Elite || MiniBoss);
             Bar.Set(Hp / MaxHp, h + 0.25f);
         }
 
@@ -240,6 +249,12 @@ public class Enemy : MonoBehaviour
             case EnemyKind.Lich:
             case EnemyKind.BoneKing:
             case EnemyKind.SpiderQueen:
+            case EnemyKind.BoneCaptain:
+            case EnemyKind.BroodMother:
+            case EnemyKind.PlagueBaron:
+            case EnemyKind.AbyssKnight:
+            case EnemyKind.LichArchivist:
+            case EnemyKind.AbyssColossus:
                 BossAI(player, dir, dist, dt);
                 break;
         }
@@ -266,7 +281,7 @@ public class Enemy : MonoBehaviour
 
     private bool BarVisible()
     {
-        return barVisible || Elite;
+        return barVisible || Elite || MiniBoss;
     }
 
     private bool CanAct()
@@ -1078,22 +1093,46 @@ public class Enemy : MonoBehaviour
         {
             case EnemyKind.BoneKing: return new Color(0.7f, 1f, 0.72f);
             case EnemyKind.SpiderQueen: return new Color(1f, 0.55f, 0.78f);
+            case EnemyKind.BoneCaptain: return new Color(0.78f, 0.95f, 1f);
+            case EnemyKind.BroodMother: return new Color(1f, 0.62f, 0.85f);
+            case EnemyKind.PlagueBaron: return new Color(0.7f, 1f, 0.55f);
+            case EnemyKind.AbyssKnight: return new Color(0.68f, 0.76f, 1f);
+            case EnemyKind.LichArchivist: return new Color(0.82f, 0.62f, 1f);
+            case EnemyKind.AbyssColossus: return new Color(1f, 0.5f, 0.55f);
             default: return new Color(0.9f, 0.62f, 0.85f);
         }
     }
 
     private IEnumerator BossSignature(Player player, int which)
     {
-        if (Def.Kind == EnemyKind.BoneKing)
+        if (Def.Kind == EnemyKind.BoneKing || Def.Kind == EnemyKind.BoneCaptain)
         {
             if (which == 4) yield return BossBoneFan(player);
             else yield return BossRoyalCharge(player);
             yield break;
         }
-        if (Def.Kind == EnemyKind.SpiderQueen)
+        if (Def.Kind == EnemyKind.SpiderQueen || Def.Kind == EnemyKind.BroodMother)
         {
             if (which == 4) yield return BossVenomFan(player);
             else yield return BossWebTrap(player);
+            yield break;
+        }
+        if (Def.Kind == EnemyKind.PlagueBaron)
+        {
+            if (which == 4) yield return BossVenomFan(player);
+            else yield return BossPlagueEdict(player);
+            yield break;
+        }
+        if (Def.Kind == EnemyKind.AbyssKnight)
+        {
+            if (which == 4) yield return BossRoyalCharge(player);
+            else yield return BossSoulLance(player);
+            yield break;
+        }
+        if (Def.Kind == EnemyKind.AbyssColossus)
+        {
+            if (which == 4) yield return BossQuake(player);
+            else yield return BossRoyalCharge(player);
             yield break;
         }
         if (which == 4) yield return BossSoulSpiral(player);
@@ -1227,6 +1266,57 @@ public class Enemy : MonoBehaviour
         {
             player.TakeDamage(damage, p);
             player.Webbed(1.8f, 0.45f);
+        }
+    }
+
+    private IEnumerator BossPlagueEdict(Player player)
+    {
+        int count = phase2 ? 5 : 3;
+        for (int i = 0; i < count; i++)
+        {
+            Vector2 p = (Vector2)player.transform.position +
+                        Random.insideUnitCircle * (phase2 ? 3.4f : 2.8f);
+            p = Game.I.Rooms.Clamp(p, 0.7f);
+            Game.I.Fx.TelegraphedCircle(p, 1.5f, 0.85f, new Color(0.55f, 0.95f, 0.4f, 0.8f));
+            StartCoroutine(PlaguePoolAt(p, 0.85f, Damage * 0.75f));
+        }
+        Game.I.Audio.Play("sfx_poison", 0.7f, 0.9f);
+        yield return new WaitForSeconds(0.3f);
+    }
+
+    private IEnumerator PlaguePoolAt(Vector2 p, float delay, float damage)
+    {
+        yield return new WaitForSeconds(delay);
+        if (!CanAct()) yield break;
+        Hazard.Poison(p, 1.5f, Damage * 0.45f, 5f, false);
+        Game.I.Fx.Explosion(p, 1.5f, new Color(0.5f, 0.85f, 0.35f));
+        var player = Game.I.Player;
+        if (player != null && !player.Dead && player.Invuln <= 0f &&
+            Vector2.Distance(player.transform.position, p) < 1.6f)
+        {
+            player.TakeDamage(damage, p);
+        }
+    }
+
+    private IEnumerator BossQuake(Player player)
+    {
+        int waves = phase2 ? 3 : 2;
+        for (int i = 0; i < waves; i++)
+        {
+            if (!CanAct()) yield break;
+            float radius = 2.2f + i * 1.4f;
+            Game.I.Fx.Ring(transform.position, new Color(1f, 0.55f, 0.4f, 0.8f), radius, 0.5f);
+            Game.I.Audio.Play("sfx_boss_roar", 0.5f, 0.8f);
+            yield return new WaitForSeconds(0.42f);
+            if (!CanAct()) yield break;
+            Game.I.Fx.Explosion(transform.position, radius, new Color(1f, 0.5f, 0.35f));
+            Game.I.Shake(0.25f, 0.35f);
+            if (player != null && !player.Dead && player.Invuln <= 0f &&
+                Vector2.Distance(player.transform.position, transform.position) < radius + 0.4f)
+            {
+                player.TakeDamage(Damage * 1.25f, transform.position, false, false, this);
+            }
+            yield return new WaitForSeconds(0.15f);
         }
     }
 
@@ -1405,6 +1495,33 @@ public class Enemy : MonoBehaviour
         Visual.Flash(new Color(0.6f, 0.9f, 1f), 0.15f);
     }
 
+    public void Stun(float duration)
+    {
+        if (Dead || duration <= 0f) return;
+        stun = Mathf.Max(stun, duration);
+        StopAllCoroutines();
+        casting = false;
+        winding = false;
+        dashing = false;
+        exploding = false;
+        Visual.SetVisible(true);
+        Visual.Walking = false;
+        Visual.Flash(new Color(1f, 0.9f, 0.55f), 0.2f);
+        Game.I.Fx.Ring(transform.position, new Color(1f, 0.85f, 0.4f, 0.7f), 0.7f, 0.3f);
+    }
+
+    /// <summary>Тянет врага к точке. Боссы сопротивляются сильнее обычных мобов.</summary>
+    public void Pull(Vector2 center, float strength)
+    {
+        if (Dead || Game.I == null || Game.I.State != GameState.Combat) return;
+        Vector2 delta = center - (Vector2)transform.position;
+        if (delta.sqrMagnitude < 0.04f) return;
+        float factor = Boss ? 0.18f : MiniBoss ? 0.45f : 1f;
+        Vector2 step = delta.normalized * strength * factor * Time.deltaTime;
+        transform.position = Game.I.Rooms.Move(transform.position, step, radius);
+        Visual.Walking = true;
+    }
+
     public void Poison(float duration, float dps)
     {
         dotTimer = Mathf.Max(dotTimer, duration);
@@ -1476,11 +1593,12 @@ public class Enemy : MonoBehaviour
         StopAllCoroutines();
         Vector2 dir = (Vector2)transform.position - source;
         Visual.Walking = false;
-        Visual.DeathAnim(dir, Boss ? 1.2f : 0.55f);
+        Visual.DeathAnim(dir, Boss ? 1.2f : MiniBoss ? 0.9f : 0.55f);
         if (Bar != null) Bar.SetVisible(false);
         Game.I.Run.OnKill(this);
         Game.I.Rooms.NotifyKilled(this);
-        Game.I.Audio.Play("sfx_death", Boss ? 1f : 0.55f, Boss ? 0.65f : 1.1f);
+        Game.I.Audio.Play("sfx_death", Boss ? 1f : MiniBoss ? 0.8f : 0.55f,
+            Boss ? 0.65f : MiniBoss ? 0.8f : 1.1f);
 
         if (Def.Kind == EnemyKind.Spider)
         {
@@ -1491,12 +1609,13 @@ public class Enemy : MonoBehaviour
             Game.I.Fx.Explosion(transform.position, 1.3f, new Color(1f, 0.6f, 0.3f));
             Game.I.Rooms.DamageEnemies(transform.position, 1.7f, Game.I.Player.DamageOut(10f));
         }
-        if (Boss)
+        if (Boss || MiniBoss)
         {
-            Game.I.Fx.Explosion(transform.position, 3.2f, new Color(0.75f, 0.45f, 0.95f));
-            Game.I.Shake(0.4f, 1f);
+            Game.I.Fx.Explosion(transform.position, Boss ? 3.2f : 2.1f,
+                new Color(0.75f, 0.45f, 0.95f));
+            Game.I.Shake(Boss ? 0.4f : 0.22f, Boss ? 1f : 0.45f);
         }
-        Destroy(gameObject, Boss ? 1.6f : 0.8f);
+        Destroy(gameObject, Boss ? 1.6f : MiniBoss ? 1.1f : 0.8f);
     }
 
     private static Vector2 Rotate(Vector2 v, float degrees)

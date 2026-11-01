@@ -36,6 +36,7 @@ public static class EndlessContent
     public const string DungeonId = "endless";
     public const int RoomCap = 999;
     public const int BossEvery = 5;
+    public const int MiniBossEvery = 3;
     public const int MaxSkillLevel = 5;
     public const int ShopOfferCount = 3;
     public const int StartCoins = 40;
@@ -47,7 +48,17 @@ public static class EndlessContent
     {
         EnemyKind.BoneKing,
         EnemyKind.SpiderQueen,
-        EnemyKind.Lich
+        EnemyKind.Lich,
+        EnemyKind.LichArchivist,
+        EnemyKind.AbyssColossus
+    };
+
+    private static readonly EnemyKind[] MiniBossRotation =
+    {
+        EnemyKind.BoneCaptain,
+        EnemyKind.BroodMother,
+        EnemyKind.PlagueBaron,
+        EnemyKind.AbyssKnight
     };
 
     private static readonly EnemyKind[] NormalPool =
@@ -131,10 +142,22 @@ public static class EndlessContent
         return BossRotation[cycle % BossRotation.Length];
     }
 
+    public static bool IsMiniBossRoom(int index)
+    {
+        if (index <= 0 || IsBoss(index)) return false;
+        return (index + 1) % MiniBossEvery == 0;
+    }
+
+    public static EnemyKind MiniBossFor(int index)
+    {
+        int cycle = Mathf.Max(0, index) / MiniBossEvery;
+        return MiniBossRotation[cycle % MiniBossRotation.Length];
+    }
+
     public static RoomDef RoomFor(int index, int seed)
     {
         bool boss = IsBoss(index);
-        bool elite = !boss && index > 0 && (index + 1) % 3 == 0;
+        bool elite = IsMiniBossRoom(index);
         var rng = new System.Random(seed * 397 + index * 7919 + 17);
         string themeId = boss ? BossTheme(BossFor(index)) : PickTheme(rng);
         RoomType type = boss ? RoomType.Boss : elite ? RoomType.Elite : RoomType.Combat;
@@ -144,7 +167,9 @@ public static class EndlessContent
             : RoomNames[Mathf.Abs(rng.Next()) % RoomNames.Length];
         string subtitle = boss
             ? "Страж этого слоя уже почуял тебя."
-            : "Бесконечный разлом · глубина " + (index + 1);
+            : elite
+                ? "Мини-босс этого слоя уже близко."
+                : "Бесконечный разлом · глубина " + (index + 1);
         return new RoomDef(type, name, subtitle, waves, themeId);
     }
 
@@ -159,7 +184,8 @@ public static class EndlessContent
         switch (kind)
         {
             case EnemyKind.SpiderQueen: return "web_boss";
-            case EnemyKind.Lich: return "throne_boss";
+            case EnemyKind.Lich:
+            case EnemyKind.LichArchivist: return "throne_boss";
             default: return "crypt_boss";
         }
     }
@@ -184,18 +210,22 @@ public static class EndlessContent
     public static float EnemyHpScale(int index)
     {
         float depth = Mathf.Max(0, index);
-        return 1f + 0.085f * depth + 0.0012f * depth * depth;
+        // К глубине 50 враги становятся ровно вдвое крепче прежней кривой.
+        float depthBonus = 1f + depth / 50f;
+        return (1f + 0.085f * depth + 0.0012f * depth * depth) * depthBonus;
     }
 
     public static float EnemyDamageScale(int index)
     {
         float depth = Mathf.Max(0, index);
-        return 1f + 0.045f * depth + 0.0004f * depth * depth;
+        float depthBonus = 1f + depth / 50f;
+        return (1f + 0.045f * depth + 0.0004f * depth * depth) * depthBonus;
     }
 
-    public static int CoinDrop(bool boss, bool elite, int depth)
+    public static int CoinDrop(bool boss, bool elite, int depth, bool miniBoss = false)
     {
         if (boss) return 30 + depth * 2;
+        if (miniBoss) return 18 + depth;
         if (elite) return 8 + depth / 2;
         return Random.Range(2, 5) + depth / 4;
     }
@@ -267,6 +297,12 @@ public static class EndlessContent
             case "volley": return "стрелы пробивают врагов и взрываются.";
             case "shadowrun": return "теневой бег обнуляет перезарядку остальных навыков.";
             case "cleave": return "после удара расходится широкая ударная волна.";
+            case "charge": return "рывок становится длиннее, а враги оглушаются дольше.";
+            case "warcry": return "клич оглушает врагов и даёт рыцарю больше щита.";
+            case "bulwark": return "оплот отражает часть урона атакующим.";
+            case "arcaneorb": return "сфера пробивает больше врагов и взрывается сильнее.";
+            case "thunderstorm": return "гроза бьёт восемь раз и оглушает выживших.";
+            case "blackhole": return "дыра схлопывается мощным взрывом.";
             default: return "навык получает новый боевой эффект.";
         }
     }
