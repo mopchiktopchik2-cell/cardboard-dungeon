@@ -397,7 +397,7 @@ public class UIRoot : MonoBehaviour
             TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(0f, 0.5f), new Vector2(-244f, 104f), new Vector2(260f, 18f), art.Sans, true);
         summaryHeader.fontStyle = FontStyle.Bold;
-        TextAt(summary.rectTransform, "v1.6.0", 12, new Color(0.6f, 0.54f, 0.45f),
+        TextAt(summary.rectTransform, "v1.6.1", 12, new Color(0.6f, 0.54f, 0.45f),
             TextAnchor.MiddleRight, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
             new Vector2(1f, 0.5f), new Vector2(244f, 104f), new Vector2(80f, 18f), art.Sans, true);
 

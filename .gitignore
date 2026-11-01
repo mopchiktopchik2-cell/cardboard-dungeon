@@ -46,6 +46,8 @@ Assets/Plugins/Editor/JetBrains*
 *.exe
 *.zip
 !Build/.gitkeep
+# Готовая сборка лежит в репозитории
+!release/*.zip
 
 # Локальная упаковка релиза
 dist/

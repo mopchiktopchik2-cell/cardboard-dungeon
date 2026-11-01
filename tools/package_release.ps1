@@ -6,11 +6,11 @@
 .DESCRIPTION
     Copies the portable .bat launcher and memo into Build/, removes stale
     shortcuts, packs only the game files (no QA build, logs or screenshots) and
-    prints the archive size and SHA256 for the GitHub release notes.
+    prints the archive size and SHA256 for the release notes.
 #>
 param(
     [string]$BuildDir = (Join-Path $PSScriptRoot '..\Build'),
-    [string]$OutputZip = (Join-Path $PSScriptRoot '..\CardboardDungeon_v1.6.0_win64.zip'),
+    [string]$OutputZip = (Join-Path $PSScriptRoot '..\release\CardboardDungeon_v1.6.1_win64.zip'),
     [string]$ExeName = 'CardboardDungeon.exe'
 )
 
@@ -66,6 +66,11 @@ $files = @(
 ) + @(
     $files | Where-Object { $launcherNames -notcontains $_.Name } | Sort-Object FullName
 )
+
+$outputDir = Split-Path -Parent $OutputZip
+if ($outputDir -and -not (Test-Path -LiteralPath $outputDir)) {
+    New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+}
 
 if (Test-Path -LiteralPath $OutputZip) {
     Remove-Item -LiteralPath $OutputZip -Force

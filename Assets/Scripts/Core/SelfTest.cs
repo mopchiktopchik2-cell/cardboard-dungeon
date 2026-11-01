@@ -14,7 +14,7 @@ public static class SelfTest
     {
         passed = 0;
         failed = 0;
-        Debug.Log("[SelfTest] begin v1.6.0");
+        Debug.Log("[SelfTest] begin v1.6.1");
 
         CheckSkills();
         CheckPerks();
