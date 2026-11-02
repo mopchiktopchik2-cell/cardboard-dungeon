@@ -38,6 +38,7 @@ public class Game : MonoBehaviour
     private Coroutine hitstop;
     private int auditPassed;
     private int auditFailed;
+    private bool shopSkillChoice;
 
     public bool InputLocked => State != GameState.Combat;
     public bool InRun => State == GameState.Intro || State == GameState.Combat || State == GameState.Clear ||
@@ -851,6 +852,7 @@ public class Game : MonoBehaviour
         }
         StopFlow();
         if (Rooms != null) Rooms.CancelPendingVictory();
+        shopSkillChoice = false;
         Time.timeScale = 1f;
         UI.HideMenu();
         UI.HideEnd();
@@ -865,6 +867,7 @@ public class Game : MonoBehaviour
     {
         StopFlow();
         if (Rooms != null) Rooms.CancelPendingVictory();
+        shopSkillChoice = false;
         Time.timeScale = 1f;
         UI.HideMenu();
         UI.HideEnd();
@@ -895,6 +898,7 @@ public class Game : MonoBehaviour
     {
         StopFlow();
         if (Rooms != null) Rooms.CancelPendingVictory();
+        shopSkillChoice = false;
         Time.timeScale = 1f;
         UI.HideEnd();
         UI.HidePause();
@@ -981,6 +985,7 @@ public class Game : MonoBehaviour
     {
         if (Player == null || Player.Dead || State == GameState.Dead) return;
         if (!Run.Endless) return;
+        shopSkillChoice = false;
         State = GameState.Perk;
         Time.timeScale = 0f;
         UI.HideBanner();
@@ -1011,6 +1016,11 @@ public class Game : MonoBehaviour
         UI.RefreshCoins();
         UI.RefreshSkills();
         Audio.Play("sfx_pickup", 0.85f);
+        if (offer.Kind == ShopOfferKind.Perk && offer.Perk != null && offer.Perk.Id == "slot" &&
+            ShowShopSkillChoice())
+        {
+            return;
+        }
         if (offer.Kind == ShopOfferKind.Upgrade && offer.TargetLevel >= EndlessContent.MaxSkillLevel)
         {
             UI.ShowBanner("МАСТЕРИЯ", offer.Skill != null
@@ -1019,6 +1029,16 @@ public class Game : MonoBehaviour
         }
         var offers = Run.BuildShopOffers(EndlessContent.ShopOfferCount);
         UI.ShowShop(offers, Run.Coins, Run.RoomIndex);
+    }
+
+    private bool ShowShopSkillChoice()
+    {
+        var skills = Run.RollSkills(3);
+        if (skills.Count == 0) return false;
+        shopSkillChoice = true;
+        UI.ShowSkills(skills, "ВЫБЕРИ НОВЫЙ НАВЫК");
+        Audio.Play("sfx_pickup", 0.7f);
+        return true;
     }
 
     public void ContinueShop()
@@ -1078,6 +1098,12 @@ public class Game : MonoBehaviour
             return;
         }
         UI.HideSkills();
+        if (shopSkillChoice)
+        {
+            shopSkillChoice = false;
+            OfferEndlessShop();
+            return;
+        }
         ContinueAfterChoice();
     }
 
@@ -1123,6 +1149,7 @@ public class Game : MonoBehaviour
 
     public void ContinueAfterChoice()
     {
+        shopSkillChoice = false;
         Time.timeScale = 1f;
         UI.HidePerks();
         UI.HideSkills();

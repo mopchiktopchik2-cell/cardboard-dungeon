@@ -10,7 +10,7 @@
 #>
 param(
     [string]$BuildDir = (Join-Path $PSScriptRoot '..\Build'),
-    [string]$OutputZip = (Join-Path $PSScriptRoot '..\release\CardboardDungeon_v1.6.1_win64.zip'),
+    [string]$OutputZip = (Join-Path $PSScriptRoot '..\release\CardboardDungeon_v1.6.2_win64.zip'),
     [string]$ExeName = 'CardboardDungeon.exe'
 )
 
